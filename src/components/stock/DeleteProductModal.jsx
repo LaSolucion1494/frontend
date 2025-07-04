@@ -2,7 +2,6 @@
 
 import { Button } from "../ui/button"
 import { X, Trash2, AlertTriangle } from "lucide-react"
-import { formatCurrency } from "../../lib/utils"
 
 const DeleteProductModal = ({ isOpen, onClose, onConfirm, product = null, loading = false }) => {
   if (!isOpen || !product) return null
@@ -18,17 +17,16 @@ const DeleteProductModal = ({ isOpen, onClose, onConfirm, product = null, loadin
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-51 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+      <div className="bg-white shadow-xl w-full max-w-md overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-red-600">
+        <div className="flex items-center justify-between p-4 bg-red-600">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
               <AlertTriangle className="w-4 h-4 text-white" />
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Confirmar Eliminación</h2>
-              <p className="text-sm text-red-100 mt-1">Esta acción no se puede deshacer</p>
             </div>
           </div>
           <Button
@@ -62,29 +60,43 @@ const DeleteProductModal = ({ isOpen, onClose, onConfirm, product = null, loadin
             <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-slate-700">Código:</span>
+                  <span className="text-sm text-slate-900 font-mono font-semibold">{product.codigo}</span>
+                </div>
+
+                <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-slate-700">Nombre:</span>
                   <span className="text-sm text-slate-900 font-semibold">{product.nombre}</span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-slate-700">Código:</span>
-                  <span className="text-sm text-slate-900 font-mono">{product.codigo}</span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-slate-700">Precio:</span>
-                  <span className="text-sm text-slate-900">{formatCurrency(product.precioCosto)}</span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-slate-700">Stock:</span>
-                  <span className="text-sm text-slate-900">{product.stock} unidades</span>
                 </div>
 
                 {product.categoria && (
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-slate-700">Categoría:</span>
                     <span className="text-sm text-slate-900">{product.categoria}</span>
+                  </div>
+                )}
+
+                {product.marca && product.marca !== "Sin Marca" && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-slate-700">Marca:</span>
+                    <span className="text-sm text-slate-900">{product.marca}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-slate-700">Stock:</span>
+                  <span className="text-sm text-slate-900 font-semibold">{product.stock} unidades</span>
+                </div>
+
+                {product.precio_venta && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-slate-700">Precio:</span>
+                    <span className="text-sm text-slate-900 font-semibold">
+                      {new Intl.NumberFormat("es-AR", {
+                        style: "currency",
+                        currency: "ARS",
+                      }).format(product.precio_venta)}
+                    </span>
                   </div>
                 )}
               </div>
@@ -97,8 +109,8 @@ const DeleteProductModal = ({ isOpen, onClose, onConfirm, product = null, loadin
                 <div className="text-sm text-amber-800">
                   <p className="font-medium">Advertencia:</p>
                   <p>
-                    Esta acción eliminará permanentemente el producto del sistema, incluyendo su historial de
-                    movimientos. Esta operación no se puede deshacer.
+                    Esta acción eliminará permanentemente el producto del sistema. Asegúrate de que no tenga ventas
+                    asociadas o movimientos de stock pendientes.
                   </p>
                 </div>
               </div>
@@ -107,13 +119,13 @@ const DeleteProductModal = ({ isOpen, onClose, onConfirm, product = null, loadin
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end space-x-3 p-6 border-t border-slate-200 bg-slate-50">
+        <div className="flex justify-end space-x-3 p-6 border-t border-slate-300 bg-slate-100">
           <Button
             type="button"
             variant="outline"
             onClick={handleClose}
             disabled={loading}
-            className="border-slate-300 text-slate-700 hover:bg-slate-50"
+            className="border-slate-800 text-slate-700 hover:bg-slate-50"
           >
             Cancelar
           </Button>

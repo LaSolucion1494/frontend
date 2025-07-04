@@ -20,8 +20,8 @@ const BarcodeModal = ({ isOpen, onClose, product }) => {
   if (!isOpen || !product) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[150] p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden relative z-[151]">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-slate-800">
           <div>
@@ -45,7 +45,7 @@ const BarcodeModal = ({ isOpen, onClose, product }) => {
           <BarcodeDisplay code={product.codigo} productName={product.nombre} showControls={true} size="large" />
 
           <div className="flex justify-center">
-            <Button onClick={handlePrintMultiple} variant="outline" className="min-w-[120px]">
+            <Button onClick={handlePrintMultiple} variant="outline" className="min-w-[120px] bg-transparent">
               <Printer className="w-4 h-4 mr-2" />
               Imprimir PDF
             </Button>

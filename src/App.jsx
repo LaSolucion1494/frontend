@@ -11,6 +11,7 @@ import Compras from "./pages/Compras"
 import ReporteCompras from "./pages/ReporteCompras"
 import Stock from "./pages/Stock"
 import Clientes from "./pages/Clientes"
+import CuentaCorriente from "./pages/CuentaCorriente"
 import ProtectedRoute from "./lib/ProtectedRoute"
 import Configuraciones from "./pages/Configuraciones"
 import Proveedores from "./pages/Proveedores"
@@ -27,7 +28,6 @@ function AppRoutes() {
       <div className="min-h-screen bg-slate-800 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-white mx-auto mb-4"></div>
-          <p className="text-white text-lg">Cargando...</p>
         </div>
       </div>
     )
@@ -105,6 +105,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute adminOnly>
             <Clientes />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/cuenta-corriente"
+        element={
+          <ProtectedRoute adminOnly>
+            <CuentaCorriente />
           </ProtectedRoute>
         }
       />

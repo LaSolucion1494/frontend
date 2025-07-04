@@ -3,13 +3,15 @@
 import { useState, useCallback } from "react"
 import { salesService } from "../services/salesService"
 import toast from "react-hot-toast"
+import { extractExactDateTime } from "../lib/date-utils"
 
 export const useSalesReports = () => {
-  const [sales, setSales] = useState([])
-  const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [sales, setSales] = useState([])
+  const [stats, setStats] = useState(null)
 
+  // CORREGIDO: Obtener ventas con información de pagos
   const fetchSales = useCallback(async (filters = {}) => {
     setLoading(true)
     setError(null)
@@ -18,34 +20,64 @@ export const useSalesReports = () => {
       const result = await salesService.getSales(filters)
 
       if (result.success) {
-        setSales(result.data)
+        // Procesar cada venta para obtener información de pagos
+        const salesWithPayments = await Promise.all(
+          result.data.map(async (sale) => {
+            try {
+              // Obtener detalles completos de la venta incluyendo pagos
+              const detailResult = await salesService.getSaleById(sale.id)
+              if (detailResult.success) {
+                return {
+                  ...sale,
+                  pagos: detailResult.data.pagos || [],
+                  detalles: detailResult.data.detalles || [],
+                }
+              }
+              return sale
+            } catch (error) {
+              console.warn(`Error al obtener detalles de venta ${sale.id}:`, error)
+              return sale
+            }
+          }),
+        )
+
+        setSales(salesWithPayments)
+        return { success: true, data: salesWithPayments }
       } else {
         setError(result.message)
         toast.error(result.message)
+        return { success: false, message: result.message }
       }
     } catch (error) {
       const message = "Error al cargar ventas"
       setError(message)
       toast.error(message)
+      return { success: false, message }
     } finally {
       setLoading(false)
     }
   }, [])
 
+  // Obtener estadísticas
   const fetchStats = useCallback(async (filters = {}) => {
     try {
       const result = await salesService.getSalesStats(filters)
 
       if (result.success) {
-        setStats(result.data)
+        setStats(result.data.estadisticas_generales)
+        return { success: true, data: result.data }
       } else {
-        console.error("Error al obtener estadísticas:", result.message)
+        toast.error(result.message)
+        return { success: false, message: result.message }
       }
     } catch (error) {
-      console.error("Error al obtener estadísticas:", error)
+      const message = "Error al obtener estadísticas"
+      toast.error(message)
+      return { success: false, message }
     }
   }, [])
 
+  // Obtener una venta por ID
   const getSaleById = async (id) => {
     setLoading(true)
     try {
@@ -58,7 +90,7 @@ export const useSalesReports = () => {
         return { success: false, message: result.message }
       }
     } catch (error) {
-      const message = "Error al obtener detalles de la venta"
+      const message = "Error al obtener venta"
       toast.error(message)
       return { success: false, message }
     } finally {
@@ -66,80 +98,62 @@ export const useSalesReports = () => {
     }
   }
 
+  // Exportar ventas
   const exportSales = async (filters = {}) => {
-    setLoading(true)
     try {
+      setLoading(true)
+
+      // Simular exportación (aquí puedes implementar la lógica real)
       const result = await salesService.getSales(filters)
 
       if (result.success) {
-        // Convertir datos a CSV
-        const csvData = convertToCSV(result.data)
-        downloadCSV(csvData, `reporte-ventas-${new Date().toISOString().split("T")[0]}.csv`)
+        // Crear CSV
+        const headers = ["Factura", "Fecha", "Cliente", "Total", "Estado", "Método de Pago"]
+        const csvContent = [
+          headers.join(","),
+          ...result.data.map((sale) =>
+            [
+              sale.numero_factura,
+              extractExactDateTime(sale.fecha_creacion).date,
+              `"${sale.cliente_nombre || "Cliente no especificado"}"`,
+              sale.total,
+              sale.estado,
+              sale.pagos?.length > 1 ? "Varios métodos" : sale.pagos?.[0]?.tipo_pago || "No especificado",
+            ].join(","),
+          ),
+        ].join("\n")
+
+        // Descargar archivo
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+        const link = document.createElement("a")
+        const url = URL.createObjectURL(blob)
+        link.setAttribute("href", url)
+        link.setAttribute("download", `ventas_${new Date().toISOString().split("T")[0]}.csv`)
+        link.style.visibility = "hidden"
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+
         toast.success("Reporte exportado exitosamente")
+        return { success: true }
       } else {
         toast.error(result.message)
+        return { success: false, message: result.message }
       }
     } catch (error) {
-      toast.error("Error al exportar reporte")
+      const message = "Error al exportar reporte"
+      toast.error(message)
+      return { success: false, message }
     } finally {
       setLoading(false)
     }
   }
 
-  const convertToCSV = (data) => {
-    if (!data.length) return ""
-
-    const headers = [
-      "Número Factura",
-      "Fecha",
-      "Cliente",
-      "Subtotal",
-      "Descuento",
-      "Total",
-      "Tipo Pago",
-      "Estado",
-      "Usuario",
-      "Items",
-    ]
-
-    const rows = data.map((sale) => [
-      sale.numero_factura,
-      sale.fecha_venta,
-      sale.cliente_nombre,
-      sale.subtotal,
-      sale.descuento,
-      sale.total,
-      sale.tipo_pago,
-      sale.estado,
-      sale.usuario_nombre,
-      sale.total_items,
-    ])
-
-    const csvContent = [headers, ...rows].map((row) => row.map((field) => `"${field}"`).join(",")).join("\n")
-
-    return csvContent
-  }
-
-  const downloadCSV = (csvContent, filename) => {
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-    const link = document.createElement("a")
-
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob)
-      link.setAttribute("href", url)
-      link.setAttribute("download", filename)
-      link.style.visibility = "hidden"
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    }
-  }
-
   return {
-    sales,
-    stats,
     loading,
     error,
+    sales,
+    stats,
     fetchSales,
     fetchStats,
     getSaleById,

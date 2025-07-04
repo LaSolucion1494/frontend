@@ -91,10 +91,10 @@ const CategoryModal = ({ isOpen, onClose, onSave, category = null, isEditing = f
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+      <div className="bg-white shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-slate-800">
+        <div className="flex items-center justify-between p-3 bg-slate-800">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-slate-600 rounded-lg flex items-center justify-center">
               <Tag className="w-4 h-4 text-white" />
@@ -131,7 +131,7 @@ const CategoryModal = ({ isOpen, onClose, onSave, category = null, isEditing = f
                   value={formData.nombre}
                   onChange={(e) => handleInputChange("nombre", e.target.value)}
                   placeholder="Ej: Repuestos de Motor"
-                  className={errors.nombre ? "border-red-500 focus:border-red-500" : ""}
+                  className={`bg-slate-100 ${errors.nombre ? "border-red-500 focus:border-red-500" : "border-slate-800"}`}
                   disabled={loading}
                   maxLength={50}
                 />
@@ -154,7 +154,7 @@ const CategoryModal = ({ isOpen, onClose, onSave, category = null, isEditing = f
                   value={formData.descripcion}
                   onChange={(e) => handleInputChange("descripcion", e.target.value)}
                   placeholder="Describe brevemente esta categoría (opcional)"
-                  className={`h-24 resize-none ${errors.descripcion ? "border-red-500 focus:border-red-500" : ""}`}
+                  className={`h-24 resize-none bg-slate-100 ${errors.descripcion ? "border-red-500 focus:border-red-500" : "border-slate-800"}`}
                   disabled={loading}
                   maxLength={200}
                 />
@@ -166,26 +166,12 @@ const CategoryModal = ({ isOpen, onClose, onSave, category = null, isEditing = f
                 )}
                 <p className="text-xs text-slate-600">Máximo 200 caracteres (opcional)</p>
               </div>
-
-              {/* Información adicional */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start space-x-2">
-                  <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="text-sm font-medium text-blue-900">Información importante</h4>
-                    <p className="text-sm text-blue-700 mt-1">
-                      Las categorías te ayudan a organizar tus productos. Una vez creada, podrás asignar productos a
-                      esta categoría.
-                    </p>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end space-x-3 p-6 border-t border-slate-200 bg-slate-50">
-            <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
+          <div className="flex justify-end space-x-3 p-6 border-t border-slate-300 bg-slate-100">
+            <Button className="border-slate-800" type="button" variant="outline" onClick={handleClose} disabled={loading}>
               Cancelar
             </Button>
             <Button type="submit" className="bg-slate-800 hover:bg-slate-700" disabled={loading}>

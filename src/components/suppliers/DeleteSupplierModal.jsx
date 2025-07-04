@@ -17,17 +17,16 @@ const DeleteSupplierModal = ({ isOpen, onClose, onConfirm, supplier = null, load
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+      <div className="bg-white shadow-xl w-full max-w-md overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-red-600">
+        <div className="flex items-center justify-between p-4 bg-red-600">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
               <AlertTriangle className="w-4 h-4 text-white" />
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Confirmar Eliminación</h2>
-              <p className="text-sm text-red-100 mt-1">Esta acción no se puede deshacer</p>
             </div>
           </div>
           <Button
@@ -98,13 +97,13 @@ const DeleteSupplierModal = ({ isOpen, onClose, onConfirm, supplier = null, load
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end space-x-3 p-6 border-t border-slate-200 bg-slate-50">
+        <div className="flex justify-end space-x-3 p-6 border-t border-slate-300 bg-slate-100">
           <Button
             type="button"
             variant="outline"
             onClick={handleClose}
             disabled={loading}
-            className="border-slate-300 text-slate-700 hover:bg-slate-50"
+            className="border-slate-800 text-slate-700 hover:bg-slate-50"
           >
             Cancelar
           </Button>

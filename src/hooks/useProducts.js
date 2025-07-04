@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useCallback } from "react"
 import { productsService } from "../services/productsService"
 import toast from "react-hot-toast"
 
@@ -8,17 +8,19 @@ export const useProducts = (initialFilters = {}) => {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [filters, setFilters] = useState(initialFilters)
+  const [sortConfig, setSortConfig] = useState({
+    sortBy: "nombre",
+    sortOrder: "asc",
+    ...initialFilters,
+  })
 
   const fetchProducts = useCallback(
     async (customFilters = {}) => {
       setLoading(true)
       setError(null)
-
       try {
-        const finalFilters = { ...filters, ...customFilters }
+        const finalFilters = { ...sortConfig, ...customFilters }
         const result = await productsService.getProducts(finalFilters)
-
         if (result.success) {
           setProducts(result.data)
         } else {
@@ -33,18 +35,16 @@ export const useProducts = (initialFilters = {}) => {
         setLoading(false)
       }
     },
-    [filters],
+    [sortConfig],
   )
 
   const createProduct = async (productData) => {
     setLoading(true)
     try {
       const result = await productsService.createProduct(productData)
-
       if (result.success) {
         toast.success("Producto creado exitosamente")
-        await fetchProducts() // Recargar la lista
-        return { success: true }
+        return { success: true, data: result.data }
       } else {
         toast.error(result.message)
         return { success: false, message: result.message }
@@ -62,11 +62,9 @@ export const useProducts = (initialFilters = {}) => {
     setLoading(true)
     try {
       const result = await productsService.updateProduct(id, productData)
-
       if (result.success) {
         toast.success("Producto actualizado exitosamente")
-        await fetchProducts() // Recargar la lista
-        return { success: true }
+        return { success: true, data: result.data }
       } else {
         toast.error(result.message)
         return { success: false, message: result.message }
@@ -84,10 +82,8 @@ export const useProducts = (initialFilters = {}) => {
     setLoading(true)
     try {
       const result = await productsService.deleteProduct(id)
-
       if (result.success) {
         toast.success("Producto eliminado exitosamente")
-        await fetchProducts() // Recargar la lista
         return { success: true }
       } else {
         toast.error(result.message)
@@ -106,11 +102,10 @@ export const useProducts = (initialFilters = {}) => {
     setLoading(true)
     try {
       const result = await productsService.getProductByCode(code)
-
       if (result.success) {
         return { success: true, data: result.data }
       } else {
-        toast.error(result.message)
+        // No mostrar toast de error aquí, puede ser un flujo normal (ej: código no existe)
         return { success: false, message: result.message }
       }
     } catch (error) {
@@ -122,30 +117,21 @@ export const useProducts = (initialFilters = {}) => {
     }
   }
 
-  const updateFilters = useCallback((newFilters) => {
-    setFilters((prev) => ({ ...prev, ...newFilters }))
+  const updateSorting = useCallback((sortBy, sortOrder) => {
+    setSortConfig({ sortBy, sortOrder })
   }, [])
-
-  const clearFilters = useCallback(() => {
-    setFilters({})
-  }, [])
-
-  useEffect(() => {
-    fetchProducts()
-  }, [fetchProducts])
 
   return {
     products,
     loading,
     error,
-    filters,
+    sortConfig,
     fetchProducts,
     createProduct,
     updateProduct,
     deleteProduct,
     getProductByCode,
-    updateFilters,
-    clearFilters,
+    updateSorting,
     refetch: fetchProducts,
   }
 }

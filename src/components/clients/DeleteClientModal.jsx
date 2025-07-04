@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "../ui/button"
-import { X, Trash2, AlertTriangle, User, Phone, Mail } from "lucide-react"
+import { X, Trash2, AlertTriangle } from "lucide-react"
 
 const DeleteClientModal = ({ isOpen, onClose, onConfirm, client = null, loading = false }) => {
   if (!isOpen || !client) return null
@@ -17,17 +17,16 @@ const DeleteClientModal = ({ isOpen, onClose, onConfirm, client = null, loading 
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-51 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white shadow-xl w-full max-w-md overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-red-600">
+        <div className="flex items-center justify-between p-4 bg-red-600">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
               <AlertTriangle className="w-4 h-4 text-white" />
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Confirmar Eliminación</h2>
-              <p className="text-sm text-red-100 mt-1">Esta acción no se puede deshacer</p>
             </div>
           </div>
           <Button
@@ -59,42 +58,37 @@ const DeleteClientModal = ({ isOpen, onClose, onConfirm, client = null, loading 
 
             {/* Client Info */}
             <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <User className="w-4 h-4 text-slate-400" />
-                  <div>
-                    <span className="text-sm font-medium text-slate-700">Nombre:</span>
-                    <p className="text-sm text-slate-900 font-semibold">{client.nombre}</p>
-                  </div>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-slate-700">Nombre:</span>
+                  <span className="text-sm text-slate-900 font-semibold">{client.nombre}</span>
                 </div>
 
+                {client.cuit && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-slate-700">CUIT:</span>
+                    <span className="text-sm text-slate-900 font-mono">{client.cuit}</span>
+                  </div>
+                )}
+
                 {client.telefono && (
-                  <div className="flex items-center space-x-3">
-                    <Phone className="w-4 h-4 text-slate-400" />
-                    <div>
-                      <span className="text-sm font-medium text-slate-700">Teléfono:</span>
-                      <p className="text-sm text-slate-900">{client.telefono}</p>
-                    </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-slate-700">Teléfono:</span>
+                    <span className="text-sm text-slate-900">{client.telefono}</span>
                   </div>
                 )}
 
                 {client.email && (
-                  <div className="flex items-center space-x-3">
-                    <Mail className="w-4 h-4 text-slate-400" />
-                    <div>
-                      <span className="text-sm font-medium text-slate-700">Email:</span>
-                      <p className="text-sm text-slate-900">{client.email}</p>
-                    </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-slate-700">Email:</span>
+                    <span className="text-sm text-slate-900 break-all">{client.email}</span>
                   </div>
                 )}
 
-                {client.cuit && (
-                  <div className="flex items-center space-x-3">
-                    <div className="w-4 h-4" />
-                    <div>
-                      <span className="text-sm font-medium text-slate-700">CUIT:</span>
-                      <p className="text-sm text-slate-900 font-mono">{client.cuit}</p>
-                    </div>
+                {client.tiene_cuenta_corriente && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-slate-700">Cuenta Corriente:</span>
+                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Habilitada</span>
                   </div>
                 )}
               </div>
@@ -117,13 +111,13 @@ const DeleteClientModal = ({ isOpen, onClose, onConfirm, client = null, loading 
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end space-x-3 p-6 border-t border-slate-200 bg-slate-50">
+        <div className="flex justify-end space-x-3 p-6 border-t border-slate-300 bg-slate-100">
           <Button
             type="button"
             variant="outline"
             onClick={handleClose}
             disabled={loading}
-            className="border-slate-300 text-slate-700 hover:bg-slate-50"
+            className="border-slate-800 text-slate-700 hover:bg-slate-50"
           >
             Cancelar
           </Button>

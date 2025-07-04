@@ -1,642 +1,620 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Search, Plus, Minus, Trash2, Package, ShoppingCart, AlertCircle, Check, X } from "lucide-react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useState, useEffect } from "react"
+import Layout from "../components/Layout"
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
+import { Button } from "../components/ui/button"
+import { Input } from "../components/ui/input"
+import { Separator } from "../components/ui/separator"
+import { Badge } from "../components/ui/badge"
 import { NumericFormat } from "react-number-format"
+import {
+  RefreshCw,
+  Check,
+  Package,
+  Building,
+  Plus,
+  TrendingUp,
+  TrendingDown,
+  Calculator,
+  Phone,
+  Mail,
+  MapPin,
+  Search,
+  FileText,
+  ShoppingCart,
+} from "lucide-react"
+import SupplierSelectionModal from "../components/purchases/SupplierSelectionModal"
+import PurchaseProductSelectionModal from "../components/purchases/PurchaseProductSelectionModal"
+import PurchasePaymentModal from "../components/purchases/PurchasePaymentModal"
+import PurchaseProductCard from "../components/purchases/PurchaseProductCard"
+import { useProducts } from "../hooks/useProducts"
+import { useSuppliers } from "../hooks/useSuppliers"
+import { usePurchases } from "../hooks/usePurchase"
+import { useConfig } from "../hooks/useConfig"
 import toast from "react-hot-toast"
 
-import Layout from "../components/Layout"
-import { useSuppliers } from "../hooks/useSuppliers"
-import { useProducts } from "../hooks/useProducts"
-import { usePurchases } from "../hooks/usePurchase"
-
-// Componente para formatear precios argentinos
-const PriceDisplay = ({ value, className = "" }) => {
-  return (
-    <span className={className}>
-      {new Intl.NumberFormat("es-AR", {
-        style: "currency",
-        currency: "ARS",
-        minimumFractionDigits: 2,
-      }).format(value || 0)}
-    </span>
-  )
-}
-
-// Componente para input de precio con formato argentino
-const PriceInput = ({ value, onChange, placeholder = "0,00", className = "", ...props }) => {
-  return (
-    <NumericFormat
-      value={value}
-      onValueChange={(values) => {
-        onChange(values.floatValue || 0)
-      }}
-      thousandSeparator="."
-      decimalSeparator=","
-      prefix="$ "
-      decimalScale={2}
-      fixedDecimalScale
-      allowNegative={false}
-      placeholder={placeholder}
-      className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
-      {...props}
-    />
-  )
-}
-
-// Componente de búsqueda de productos mejorado
-const ProductSearch = ({ onProductSelect, selectedProducts }) => {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [searchResults, setSearchResults] = useState([])
-  const [isSearching, setIsSearching] = useState(false)
-  const [showResults, setShowResults] = useState(false)
-  const { products, fetchProducts } = useProducts()
-  const searchRef = useRef(null)
-  const resultsRef = useRef(null)
-
-  // Buscar productos en tiempo real
-  useEffect(() => {
-    const searchProducts = async () => {
-      if (searchTerm.trim().length < 2) {
-        setSearchResults([])
-        setShowResults(false)
-        return
-      }
-
-      setIsSearching(true)
-      try {
-        await fetchProducts({ search: searchTerm.trim() })
-      } catch (error) {
-        console.error("Error searching products:", error)
-      } finally {
-        setIsSearching(false)
-      }
-    }
-
-    const timeoutId = setTimeout(searchProducts, 300)
-    return () => clearTimeout(timeoutId)
-  }, [searchTerm, fetchProducts])
-
-  // Actualizar resultados cuando cambien los productos
-  useEffect(() => {
-    if (searchTerm.trim().length >= 2) {
-      const filteredProducts = products.filter(
-        (product) => !selectedProducts.some((selected) => selected.id === product.id),
-      )
-      setSearchResults(filteredProducts)
-      setShowResults(true)
-    }
-  }, [products, searchTerm, selectedProducts])
-
-  // Cerrar resultados al hacer clic fuera
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        searchRef.current &&
-        !searchRef.current.contains(event.target) &&
-        resultsRef.current &&
-        !resultsRef.current.contains(event.target)
-      ) {
-        setShowResults(false)
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
-
-  const handleProductDoubleClick = (product) => {
-    onProductSelect(product)
-    setSearchTerm("")
-    setShowResults(false)
-  }
-
-  return (
-    <div className="relative">
-      <div ref={searchRef} className="flex space-x-2">
-        <div className="flex-1 relative">
-          <Input
-            placeholder="Buscar producto por código o nombre..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onFocus={() => searchTerm.trim().length >= 2 && setShowResults(true)}
-            className="pr-10"
-          />
-          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-            {isSearching ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-            ) : (
-              <Search className="h-4 w-4 text-gray-400" />
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Resultados de búsqueda */}
-      {showResults && (
-        <div
-          ref={resultsRef}
-          className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto"
-        >
-          {searchResults.length > 0 ? (
-            <div className="p-2">
-              <div className="text-xs text-gray-500 px-2 py-1 border-b">
-                {searchResults.length} producto(s) encontrado(s) - Doble clic para agregar
-              </div>
-              {searchResults.map((product) => (
-                <div
-                  key={product.id}
-                  onDoubleClick={() => handleProductDoubleClick(product)}
-                  className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">{product.nombre}</div>
-                      <div className="text-sm text-gray-500">
-                        Código: {product.codigo} • {product.marca || "Sin marca"}
-                      </div>
-                      <div className="text-xs text-gray-400">Stock: {product.stock} unidades</div>
-                    </div>
-                    <div className="text-right">
-                      <PriceDisplay value={product.precioCosto} className="font-medium text-green-600" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : searchTerm.trim().length >= 2 && !isSearching ? (
-            <div className="p-4 text-center text-gray-500">
-              <X className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-              <p>No se encontraron productos</p>
-              <p className="text-xs">Intente con otro término de búsqueda</p>
-            </div>
-          ) : null}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Modal para seleccionar cantidad
-const QuantityModal = ({ isOpen, onClose, product, onConfirm }) => {
-  const [quantity, setQuantity] = useState(1)
-  const [price, setPrice] = useState(0)
-
-  useEffect(() => {
-    if (product) {
-      setQuantity(1)
-      setPrice(product.precioCosto || 0)
-    }
-  }, [product])
-
-  const handleConfirm = () => {
-    if (quantity > 0 && price >= 0) {
-      onConfirm({
-        ...product,
-        cantidad: quantity,
-        precioUnitario: price,
-      })
-      onClose()
-    } else {
-      toast.error("La cantidad debe ser mayor a 0 y el precio válido")
-    }
-  }
-
-  if (!product) return null
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Agregar Producto</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <div className="font-medium">{product.nombre}</div>
-            <div className="text-sm text-gray-500">
-              {product.codigo} • {product.marca || "Sin marca"}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Cantidad</Label>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  disabled={quantity <= 1}
-                >
-                  <Minus className="h-4 w-4" />
-                </Button>
-                <Input
-                  type="number"
-                  min="1"
-                  value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, Number.parseInt(e.target.value) || 1))}
-                  className="text-center"
-                />
-                <Button variant="outline" size="sm" onClick={() => setQuantity(quantity + 1)}>
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Precio Unitario</Label>
-              <PriceInput value={price} onChange={setPrice} />
-            </div>
-          </div>
-
-          <div className="p-3 bg-blue-50 rounded-lg">
-            <div className="flex justify-between items-center">
-              <span className="font-medium">Subtotal:</span>
-              <PriceDisplay value={quantity * price} className="font-bold text-blue-600" />
-            </div>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button onClick={handleConfirm}>
-            <Check className="h-4 w-4 mr-2" />
-            Agregar
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// Componente principal
-export default function Compras() {
-  const { suppliers } = useSuppliers()
-  const { createPurchase, loading } = usePurchases()
-
-  // Estado del formulario principal
+const Compras = () => {
+  const [cartProducts, setCartProducts] = useState([])
+  const [proveedorSeleccionado, setProveedorSeleccionado] = useState(null)
   const [formData, setFormData] = useState({
-    proveedorId: "",
+    subtotal: 0,
+    interestDiscount: 0,
+    interestDiscountType: "amount",
+    isInterest: true,
+    total: 0,
+    notes: "",
     fechaCompra: new Date().toISOString().split("T")[0],
-    descuento: 0,
-    observaciones: "",
   })
 
-  // Estado para productos
-  const [selectedProducts, setSelectedProducts] = useState([])
-  const [quantityModalOpen, setQuantityModalOpen] = useState(false)
-  const [selectedProductForModal, setSelectedProductForModal] = useState(null)
+  const [showSupplierModal, setShowSupplierModal] = useState(false)
+  const [showProductModal, setShowProductModal] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
 
-  // Calcular totales
-  const subtotal = selectedProducts.reduce((sum, product) => sum + product.cantidad * product.precioUnitario, 0)
-  const total = subtotal - (formData.descuento || 0)
+  const { products, loading: loadingProducts, fetchProducts } = useProducts()
+  const { suppliers, loading: loadingSuppliers, fetchSuppliers } = useSuppliers()
+  const { loading: loadingPurchase, createPurchase, preparePurchaseDataFromForm } = usePurchases()
+  const { config, loading: loadingConfig } = useConfig()
 
-  // Manejar selección de producto desde búsqueda
-  const handleProductSelect = (product) => {
-    setSelectedProductForModal(product)
-    setQuantityModalOpen(true)
+  useEffect(() => {
+    fetchProducts()
+    fetchSuppliers()
+  }, [])
+
+  // Seleccionar automáticamente "Sin Proveedor" al cargar
+  useEffect(() => {
+    if (suppliers.length > 0 && !proveedorSeleccionado) {
+      const sinProveedor = suppliers.find((supplier) => supplier.id === 1)
+      if (sinProveedor) {
+        setProveedorSeleccionado({
+          id: 1,
+          nombre: "Sin Proveedor",
+          tipo: "sin_proveedor",
+          tiene_cuenta_corriente: false,
+        })
+      }
+    }
+  }, [suppliers, proveedorSeleccionado])
+
+  useEffect(() => {
+    calculateTotals()
+  }, [cartProducts, formData.interestDiscount, formData.interestDiscountType, formData.isInterest])
+
+  const calculateTotals = () => {
+    const subtotal = cartProducts.reduce((sum, product) => sum + product.quantity * product.precio_costo, 0)
+
+    let adjustment = 0
+    const value = Number.parseFloat(formData.interestDiscount) || 0
+
+    if (formData.interestDiscountType === "percentage") {
+      adjustment = (subtotal * value) / 100
+    } else {
+      adjustment = value
+    }
+
+    if (!formData.isInterest) {
+      adjustment = -adjustment
+    }
+
+    const total = Math.max(0, subtotal + adjustment)
+    setFormData((prev) => ({ ...prev, subtotal, total }))
   }
 
-  // Confirmar agregado de producto
-  const handleConfirmProduct = (productWithQuantity) => {
-    setSelectedProducts((prev) => [...prev, productWithQuantity])
-    toast.success("Producto agregado a la compra")
+  const addProductToCart = (product) => {
+    const existingProduct = cartProducts.find((p) => p.id === product.id)
+    if (existingProduct) {
+      updateProductQuantity(product.id, existingProduct.quantity + 1)
+    } else {
+      const productWithDefaults = {
+        ...product,
+        quantity: 1,
+        precio_costo: product.precio_costo || 0,
+      }
+      setCartProducts((prev) => [...prev, productWithDefaults])
+    }
+    toast.success(`${product.nombre} agregado al carrito`)
   }
 
-  // Actualizar cantidad de producto
   const updateProductQuantity = (productId, newQuantity) => {
-    if (newQuantity < 1) return
-    setSelectedProducts((prev) =>
-      prev.map((product) => (product.id === productId ? { ...product, cantidad: newQuantity } : product)),
+    if (newQuantity <= 0) {
+      removeProductFromCart(productId)
+      return
+    }
+    setCartProducts((prev) =>
+      prev.map((product) => (product.id === productId ? { ...product, quantity: newQuantity } : product)),
     )
   }
 
-  // Actualizar precio de producto
-  const updateProductPrice = (productId, newPrice) => {
-    setSelectedProducts((prev) =>
-      prev.map((product) => (product.id === productId ? { ...product, precioUnitario: newPrice } : product)),
+  const updateProductPrice = (productId, newPriceData) => {
+    setCartProducts((prev) =>
+      prev.map((product) => {
+        if (product.id === productId) {
+          return {
+            ...product,
+            ...newPriceData,
+          }
+        }
+        return product
+      }),
     )
   }
 
-  // Eliminar producto
-  const removeProduct = (productId) => {
-    setSelectedProducts((prev) => prev.filter((product) => product.id !== productId))
-    toast.success("Producto eliminado")
+  const removeProductFromCart = (productId) => {
+    setCartProducts((prev) => prev.filter((product) => product.id !== productId))
   }
 
-  // Limpiar formulario
-  const clearForm = () => {
+  const clearCart = () => {
+    setCartProducts([])
+    const sinProveedor = suppliers.find((supplier) => supplier.id === 1)
+    if (sinProveedor) {
+      setProveedorSeleccionado({
+        id: 1,
+        nombre: "Sin Proveedor",
+        tipo: "sin_proveedor",
+        tiene_cuenta_corriente: false,
+      })
+    } else {
+      setProveedorSeleccionado(null)
+    }
     setFormData({
-      proveedorId: "",
+      subtotal: 0,
+      interestDiscount: 0,
+      interestDiscountType: "amount",
+      isInterest: true,
+      total: 0,
+      notes: "",
       fechaCompra: new Date().toISOString().split("T")[0],
-      descuento: 0,
-      observaciones: "",
     })
-    setSelectedProducts([])
   }
 
-  // Guardar compra
-  const handleSavePurchase = async () => {
-    // Validaciones
-    if (!formData.proveedorId) {
-      toast.error("Seleccione un proveedor")
+  const handlePaymentConfirm = async (payments, recibirInmediatamente = false) => {
+    if (cartProducts.length === 0) {
+      toast.error("Debe agregar al menos un producto")
       return
     }
 
-    if (!formData.fechaCompra) {
-      toast.error("Seleccione una fecha de compra")
+    if (!payments || payments.length === 0) {
+      toast.error("Debe agregar al menos un método de pago")
       return
     }
 
-    if (selectedProducts.length === 0) {
-      toast.error("Agregue al menos un producto a la compra")
+    if (!proveedorSeleccionado) {
+      toast.error("Debe seleccionar un proveedor")
       return
     }
 
-    // Preparar datos para enviar
-    const purchaseData = {
-      proveedorId: Number.parseInt(formData.proveedorId),
-      fechaCompra: formData.fechaCompra,
-      descuento: formData.descuento || 0,
-      observaciones: formData.observaciones,
-      detalles: selectedProducts.map((product) => ({
-        productoId: product.id,
-        cantidad: product.cantidad,
-        precioUnitario: product.precioUnitario,
-      })),
+    try {
+      const purchaseData = preparePurchaseDataFromForm(
+        formData,
+        cartProducts,
+        payments,
+        proveedorSeleccionado,
+        recibirInmediatamente,
+      )
+
+      const result = await createPurchase(purchaseData)
+
+      if (result.success) {
+        setShowPaymentModal(false)
+        clearCart()
+
+        const message = recibirInmediatamente
+          ? "Compra registrada y productos recibidos exitosamente"
+          : "Compra registrada exitosamente"
+
+        toast.success(message)
+      } else {
+        toast.error(result.message || "Error al registrar la compra")
+      }
+    } catch (error) {
+      console.error("Error al procesar la compra:", error)
+      toast.error("Error inesperado al procesar la compra")
+    }
+  }
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("es-AR", {
+      style: "currency",
+      currency: "ARS",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount || 0)
+  }
+
+  const handleInterestDiscountChange = (values) => {
+    const value = Number.parseFloat(values.value) || 0
+    let adjustment = 0
+
+    if (formData.interestDiscountType === "percentage") {
+      adjustment = (formData.subtotal * value) / 100
+    } else {
+      adjustment = value
     }
 
-    const result = await createPurchase(purchaseData)
-
-    if (result.success) {
-      clearForm()
+    if (!formData.isInterest) {
+      adjustment = -adjustment
     }
+
+    const total = Math.max(0, formData.subtotal + adjustment)
+    setFormData((prev) => ({
+      ...prev,
+      interestDiscount: values.value,
+      total,
+    }))
+  }
+
+  const getAdjustmentAmount = () => {
+    const value = Number.parseFloat(formData.interestDiscount) || 0
+    if (formData.interestDiscountType === "percentage") {
+      return (formData.subtotal * value) / 100
+    }
+    return value
+  }
+
+  const canOpenProductModal = () => {
+    return !!proveedorSeleccionado
+  }
+
+  const canProcessPayment = () => {
+    return !!proveedorSeleccionado && cartProducts.length > 0
+  }
+
+  if (loadingConfig) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-800 mx-auto mb-4"></div>
+            <p className="text-gray-600">Cargando configuración...</p>
+          </div>
+        </div>
+      </Layout>
+    )
   }
 
   return (
     <Layout>
-      <div className="p-6 max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
-              <ShoppingCart className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Nueva Compra</h1>
-              <p className="text-gray-600">Registre una nueva compra de productos</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Formulario principal */}
+      <div className="max-w-[95rem] mx-auto px-4 py-6 min-h-screen">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Columna Principal */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Información básica */}
-            <Card className="shadow-sm border-0 ring-1 ring-gray-200">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center space-x-2 text-lg">
-                  <Package className="h-5 w-5 text-blue-600" />
-                  <span>Información de la Compra</span>
+            {/* Proveedor */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-4 bg-slate-800">
+                <CardTitle className="text-lg font-semibold text-gray-900 flex items-center justify-between">
+                  <div className="flex items-center text-white">
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                      <Building className="w-4 h-4 text-blue-600" />
+                    </div>
+                    Proveedor
+                  </div>
+                  <Button
+                    onClick={() => setShowSupplierModal(true)}
+                    variant="outline"
+                    size="sm"
+                    className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                  >
+                    <Search className="w-4 h-4 mr-1" />
+                    {proveedorSeleccionado && proveedorSeleccionado.id !== 1 ? "Cambiar" : "Seleccionar"}
+                  </Button>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="proveedor" className="text-sm font-medium">
-                      Proveedor *
-                    </Label>
-                    <Select
-                      value={formData.proveedorId}
-                      onValueChange={(value) => setFormData((prev) => ({ ...prev, proveedorId: value }))}
-                    >
-                      <SelectTrigger className="h-11">
-                        <SelectValue placeholder="Seleccionar proveedor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {suppliers.map((supplier) => (
-                          <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                            {supplier.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+              <CardContent className="pt-0">
+                {proveedorSeleccionado ? (
+                  <div className="bg-gray-200 rounded-lg p-4 -mt-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900 text-lg">{proveedorSeleccionado.nombre}</h3>
+                        {proveedorSeleccionado.telefono || proveedorSeleccionado.email ? (
+                          <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
+                            {proveedorSeleccionado.telefono && (
+                              <div className="flex items-center">
+                                <Phone className="w-4 h-4 mr-1" />
+                                {proveedorSeleccionado.telefono}
+                              </div>
+                            )}
+                            {proveedorSeleccionado.email && (
+                              <div className="flex items-center">
+                                <Mail className="w-4 h-4 mr-1" />
+                                {proveedorSeleccionado.email}
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+                        {proveedorSeleccionado.direccion && (
+                          <div className="flex items-center mt-2 text-sm text-gray-600">
+                            <MapPin className="w-4 h-4 mr-1" />
+                            {proveedorSeleccionado.direccion}
+                          </div>
+                        )}
+                        {proveedorSeleccionado.tiene_cuenta_corriente ? (
+                          <div className="flex items-center mt-2">
+                            <FileText className="w-4 h-4 mr-1 text-orange-600" />
+                            <span className="text-sm text-orange-700 font-medium">Cuenta Corriente</span>
+                            <Badge variant="outline" className="ml-2 text-xs text-white bg-slate-800">
+                              Disponible:{" "}
+                              {proveedorSeleccionado.limite_credito === null
+                                ? "Ilimitado"
+                                : formatCurrency(
+                                    proveedorSeleccionado.limite_credito - proveedorSeleccionado.saldo_cuenta_corriente,
+                                  )}
+                            </Badge>
+                          </div>
+                        ) : null}
+                        {proveedorSeleccionado.id === 1 && (
+                          <Badge variant="outline" className="mt-2 text-xs bg-blue-100 text-blue-700 border-blue-300">
+                            Compra rápida
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Building className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <p className="font-medium">No hay proveedor seleccionado</p>
+                    <p className="text-sm text-gray-400 mt-1">Haga clic en "Seleccionar" para elegir un proveedor</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="fechaCompra" className="text-sm font-medium">
-                      Fecha de Compra *
-                    </Label>
+            {/* Productos */}
+            <Card className="border-0 shadow-sm mb-">
+              <CardHeader className="pb-4 bg-slate-800">
+                <CardTitle className="text-lg font-semibold text-gray-900 flex items-center justify-between">
+                  <div className="flex items-center text-white">
+                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                      <Package className="w-4 h-4 text-green-600" />
+                    </div>
+                    Productos
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      onClick={() => setShowProductModal(true)}
+                      disabled={!canOpenProductModal()}
+                      variant="outline"
+                      size="sm"
+                      className="border-green-200 text-green-700 hover:bg-green-50 disabled:opacity-50"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Agregar
+                    </Button>
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {cartProducts.length > 0 ? (
+                  <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                    {cartProducts.map((product) => (
+                      <PurchaseProductCard
+                        key={product.id}
+                        product={product}
+                        onUpdateQuantity={updateProductQuantity}
+                        onRemove={removeProductFromCart}
+                        onUpdatePrice={updateProductPrice}
+                        formatCurrency={formatCurrency}
+                        config={config}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <p className="font-medium">No hay productos en el carrito</p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      {canOpenProductModal()
+                        ? "Haga clic en 'Agregar' para buscar productos"
+                        : "Primero seleccione un proveedor"}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar - Cálculos y Acciones */}
+          <div className="space-y-6">
+            <div className="sticky top-32 z-10">
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="pb-4 bg-slate-800">
+                  <CardTitle className="text-lg font-semibold text-white flex items-center">
+                    <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
+                      <Calculator className="w-4 h-4 text-orange-600" />
+                    </div>
+                    Totales
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-6 -mt-4">
+                  {/* Fecha de compra */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700 flex items-center">
+                        <FileText className="w-4 h-4 mr-1.5 text-gray-600" />
+                        Fecha de Compra
+                      </span>
+                    </div>
                     <Input
-                      id="fechaCompra"
                       type="date"
                       value={formData.fechaCompra}
                       onChange={(e) => setFormData((prev) => ({ ...prev, fechaCompra: e.target.value }))}
-                      className="h-11"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="observaciones" className="text-sm font-medium">
-                    Observaciones
-                  </Label>
-                  <Textarea
-                    id="observaciones"
-                    placeholder="Observaciones adicionales sobre la compra..."
-                    value={formData.observaciones}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, observaciones: e.target.value }))}
-                    rows={3}
-                    className="resize-none"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Búsqueda de productos */}
-            <Card className="shadow-sm border-0 ring-1 ring-gray-200">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center space-x-2 text-lg">
-                  <Search className="h-5 w-5 text-green-600" />
-                  <span>Buscar Productos</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ProductSearch onProductSelect={handleProductSelect} selectedProducts={selectedProducts} />
-              </CardContent>
-            </Card>
-
-            {/* Lista de productos */}
-            {selectedProducts.length > 0 && (
-              <Card className="shadow-sm border-0 ring-1 ring-gray-200">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg">Productos Agregados ({selectedProducts.length})</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {selectedProducts.map((product) => (
-                      <div key={product.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="font-medium text-gray-900">{product.nombre}</div>
-                            <div className="text-sm text-gray-500">
-                              {product.codigo} • {product.marca}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center space-x-4">
-                            {/* Control de cantidad */}
-                            <div className="flex items-center space-x-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => updateProductQuantity(product.id, product.cantidad - 1)}
-                                disabled={product.cantidad <= 1}
-                                className="h-8 w-8 p-0"
-                              >
-                                <Minus className="h-4 w-4" />
-                              </Button>
-                              <span className="w-12 text-center font-medium">{product.cantidad}</span>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => updateProductQuantity(product.id, product.cantidad + 1)}
-                                className="h-8 w-8 p-0"
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </div>
-
-                            {/* Precio unitario */}
-                            <div className="w-32">
-                              <PriceInput
-                                value={product.precioUnitario}
-                                onChange={(value) => updateProductPrice(product.id, value)}
-                                className="h-8 text-sm"
-                              />
-                            </div>
-
-                            {/* Subtotal */}
-                            <div className="w-24 text-right">
-                              <PriceDisplay
-                                value={product.cantidad * product.precioUnitario}
-                                className="font-semibold text-green-600"
-                              />
-                            </div>
-
-                            {/* Botón eliminar */}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeProduct(product.id)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Panel lateral - Resumen */}
-          <div className="space-y-6">
-            <Card className="shadow-lg border-0 ring-1 ring-gray-200 sticky top-6">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg">Resumen de Compra</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Productos:</span>
-                    <span className="font-medium">{selectedProducts.length}</span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Subtotal:</span>
-                    <PriceDisplay value={subtotal} className="font-medium" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="descuento" className="text-sm font-medium">
-                      Descuento
-                    </Label>
-                    <PriceInput
-                      value={formData.descuento}
-                      onChange={(value) => setFormData((prev) => ({ ...prev, descuento: value }))}
+                      className="border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
 
                   <Separator />
 
-                  <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                    <span className="font-semibold text-lg">Total:</span>
-                    <PriceDisplay value={total} className="font-bold text-xl text-blue-600" />
+                  {/* Subtotal */}
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-gray-600">Subtotal</span>
+                    <span className="font-semibold text-gray-900 text-lg">{formatCurrency(formData.subtotal)}</span>
                   </div>
-                </div>
 
-                <div className="space-y-3 pt-2">
+                  {/* Ajustes */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">Ajustes</span>
+                      <div className="flex rounded-lg border border-gray-200 p-1">
+                        <button
+                          onClick={() => setFormData((prev) => ({ ...prev, isInterest: false }))}
+                          className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                            !formData.isInterest ? "bg-green-100 text-green-700" : "text-gray-500 hover:text-gray-700"
+                          }`}
+                        >
+                          <TrendingDown className="w-3 h-3 mr-1 inline" />
+                          Descuento
+                        </button>
+                        <button
+                          onClick={() => setFormData((prev) => ({ ...prev, isInterest: true }))}
+                          className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                            formData.isInterest ? "bg-red-100 text-red-700" : "text-gray-500 hover:text-gray-700"
+                          }`}
+                        >
+                          <TrendingUp className="w-3 h-3 mr-1 inline" />
+                          Interés
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="col-span-2">
+                        {formData.interestDiscountType === "amount" ? (
+                          <NumericFormat
+                            value={formData.interestDiscount}
+                            onValueChange={handleInterestDiscountChange}
+                            thousandSeparator="."
+                            decimalSeparator=","
+                            decimalScale={2}
+                            fixedDecimalScale={true}
+                            allowNegative={false}
+                            placeholder="0,00"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        ) : (
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={formData.interestDiscount}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              setFormData((prev) => ({ ...prev, interestDiscount: value }))
+                              handleInterestDiscountChange({ value })
+                            }}
+                            placeholder="0.00"
+                            className="text-sm border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        )}
+                      </div>
+                      <select
+                        value={formData.interestDiscountType}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, interestDiscountType: e.target.value }))}
+                        className="px-2 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="amount">ARS</option>
+                        <option value="percentage">%</option>
+                      </select>
+                    </div>
+
+                    {formData.interestDiscount > 0 && (
+                      <div className="flex justify-between items-center text-sm py-1">
+                        <span className="text-gray-600">
+                          {formData.isInterest ? "Interés aplicado" : "Descuento aplicado"}
+                        </span>
+                        <span className={`font-medium ${formData.isInterest ? "text-red-600" : "text-green-600"}`}>
+                          {formData.isInterest ? "+" : "-"}
+                          {formatCurrency(getAdjustmentAmount())}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Total */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-semibold text-gray-900">Total</span>
+                      <span className="text-2xl font-bold text-gray-900">{formatCurrency(formData.total)}</span>
+                    </div>
+                  </div>
+
+                  {/* Botón Principal */}
                   <Button
-                    onClick={handleSavePurchase}
-                    disabled={loading || selectedProducts.length === 0}
-                    className="w-full h-12 text-base font-medium"
+                    onClick={() => setShowPaymentModal(true)}
+                    disabled={!canProcessPayment()}
+                    className="w-full bg-slate-800 hover:bg-slate-900 text-white h-12 text-base font-semibold rounded-lg disabled:opacity-50"
                     size="lg"
                   >
-                    {loading ? (
-                      <div className="flex items-center space-x-2">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                        <span>Guardando...</span>
+                    <ShoppingCart className="w-5 h-5 mr-2" />
+                    Procesar Compra
+                  </Button>
+
+                  {/* Acciones Secundarias */}
+                  <div className="grid grid-cols-1 gap-3">
+                    <Button
+                      onClick={clearCart}
+                      variant="outline"
+                      className="border-gray-200 text-gray-700 hover:bg-gray-50 bg-transparent"
+                    >
+                      <RefreshCw className="w-4 h-4 mr-1" />
+                      Limpiar Todo
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Información Adicional */}
+              {canProcessPayment() && (
+                <Card className="border-0 shadow-sm bg-blue-50 border-blue-100 mt-4">
+                  <CardContent className="p-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <Check className="w-4 h-4 text-blue-600" />
                       </div>
-                    ) : (
-                      <>
-                        <Check className="h-5 w-5 mr-2" />
-                        Guardar Compra
-                      </>
-                    )}
-                  </Button>
-
-                  <Button variant="outline" onClick={clearForm} className="w-full h-10" disabled={loading}>
-                    Limpiar Formulario
-                  </Button>
-                </div>
-
-                {selectedProducts.length === 0 && (
-                  <Alert className="border-amber-200 bg-amber-50">
-                    <AlertCircle className="h-4 w-4 text-amber-600" />
-                    <AlertDescription className="text-amber-800">
-                      Busque y agregue productos para continuar con la compra.
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
+                      <div>
+                        <h4 className="font-medium text-blue-900 text-sm">Todo listo</h4>
+                        <p className="text-blue-700 text-xs mt-1">
+                          La compra está completa y lista para procesar el pago.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Modal de cantidad */}
-        <QuantityModal
-          isOpen={quantityModalOpen}
-          onClose={() => setQuantityModalOpen(false)}
-          product={selectedProductForModal}
-          onConfirm={handleConfirmProduct}
+        {/* Modales */}
+        <SupplierSelectionModal
+          isOpen={showSupplierModal}
+          onClose={() => setShowSupplierModal(false)}
+          onSupplierSelect={setProveedorSeleccionado}
+          proveedores={suppliers}
+          loading={loadingSuppliers}
+          selectedSupplier={proveedorSeleccionado}
+        />
+
+        <PurchaseProductSelectionModal
+          isOpen={showProductModal}
+          onClose={() => setShowProductModal(false)}
+          onProductSelect={addProductToCart}
+          products={products}
+          loading={loadingProducts}
+        />
+
+        <PurchasePaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          total={formData.total}
+          onConfirm={handlePaymentConfirm}
+          selectedSupplier={proveedorSeleccionado?.tipo !== "sin_proveedor" ? proveedorSeleccionado : null}
+          loading={loadingPurchase}
         />
       </div>
     </Layout>
   )
 }
+
+export default Compras

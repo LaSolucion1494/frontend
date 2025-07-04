@@ -15,25 +15,14 @@ export const configService = {
     }
   },
 
-  // Obtener una configuración específica
-  getConfigByKey: async (key) => {
+  // Actualizar una o varias configuraciones
+  updateConfig: async (configs, recalculatePrices = false) => {
     try {
-      const response = await apiClient.get(`/config/${key}`)
-      return { success: true, data: response.data }
-    } catch (error) {
+      const response = await apiClient.put("/config", { configs, recalculatePrices })
       return {
-        success: false,
-        message: error.response?.data?.message || "Error al obtener configuración",
-        error: error.response?.data,
+        success: true,
+        data: response.data,
       }
-    }
-  },
-
-  // Actualizar configuración
-  updateConfig: async (configs) => {
-    try {
-      const response = await apiClient.put("/config", { configs })
-      return { success: true, data: response.data }
     } catch (error) {
       return {
         success: false,
@@ -43,15 +32,18 @@ export const configService = {
     }
   },
 
-  // Actualizar una configuración específica
-  updateConfigByKey: async (key, valor) => {
+  // Recalcular todos los precios de venta desde el endpoint de configuración
+  recalculateAllPrices: async () => {
     try {
-      const response = await apiClient.put(`/config/${key}`, { valor })
-      return { success: true, data: response.data }
+      const response = await apiClient.post("/config/recalculate-prices")
+      return {
+        success: true,
+        data: response.data,
+      }
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || "Error al actualizar configuración",
+        message: error.response?.data?.message || "Error al recalcular precios",
         error: error.response?.data,
       }
     }

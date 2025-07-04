@@ -107,10 +107,10 @@ const SupplierModal = ({ isOpen, onClose, onSave, supplier = null, isEditing = f
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-xl max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+      <div className=" bg-white shadow-xl w-full max-w-xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-slate-800">
+        <div className="flex items-center justify-between p-4 bg-slate-800 ">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-slate-600 rounded-lg flex items-center justify-center">
               <Truck className="w-4 h-4 text-white" />
@@ -147,7 +147,8 @@ const SupplierModal = ({ isOpen, onClose, onSave, supplier = null, isEditing = f
                   value={formData.cuit}
                   onChange={(e) => handleInputChange("cuit", e.target.value)}
                   placeholder="Ej: 20-12345678-9"
-                  className={errors.cuit ? "border-red-500 focus:border-red-500" : ""}
+                  className={`bg-slate-50 ${errors.cuit ? "border-red-500 focus:border-red-500" : "border-slate-800"}`}
+
                   disabled={loading}
                   maxLength={15}
                 />
@@ -170,7 +171,7 @@ const SupplierModal = ({ isOpen, onClose, onSave, supplier = null, isEditing = f
                   value={formData.nombre}
                   onChange={(e) => handleInputChange("nombre", e.target.value)}
                   placeholder="Ej: Distribuidora ABC"
-                  className={errors.nombre ? "border-red-500 focus:border-red-500" : ""}
+                  className={`bg-slate-50 ${errors.nombre ? "border-red-500 focus:border-red-500" : "border-slate-800"}`}
                   disabled={loading}
                   maxLength={100}
                 />
@@ -193,7 +194,7 @@ const SupplierModal = ({ isOpen, onClose, onSave, supplier = null, isEditing = f
                   value={formData.telefono}
                   onChange={(e) => handleInputChange("telefono", e.target.value)}
                   placeholder="Ej: +54 11 1234-5678"
-                  className={errors.telefono ? "border-red-500 focus:border-red-500" : ""}
+                  className={`bg-slate-50 ${errors.telefono ? "border-red-500 focus:border-red-500" : "border-slate-800"}`}
                   disabled={loading}
                   maxLength={20}
                 />
@@ -214,7 +215,7 @@ const SupplierModal = ({ isOpen, onClose, onSave, supplier = null, isEditing = f
                   id="direccion"
                   value={formData.direccion}
                   onChange={(e) => handleInputChange("direccion", e.target.value)}
-                  className={`h-20 resize-none ${errors.direccion ? "border-red-500 focus:border-red-500" : ""}`}
+                  className={`h-20 resize-none bg-slate-50 ${errors.direccion ? "border-red-500 focus:border-red-500" : "border-slate-800"}`}
                   disabled={loading}
                   maxLength={500}
                 />
@@ -229,8 +230,8 @@ const SupplierModal = ({ isOpen, onClose, onSave, supplier = null, isEditing = f
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end space-x-3 p-6 border-t border-slate-200 bg-slate-50">
-            <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
+          <div className="flex justify-end space-x-3 p-6 border-t border-slate-300 bg-slate-100">
+            <Button className="border-slate-800" type="button" variant="outline" onClick={handleClose} disabled={loading}>
               Cancelar
             </Button>
             <Button type="submit" className="bg-slate-800 hover:bg-slate-700" disabled={loading}>

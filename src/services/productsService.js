@@ -5,13 +5,11 @@ export const productsService = {
   getProducts: async (filters = {}) => {
     try {
       const params = new URLSearchParams()
-
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== "") {
           params.append(key, value)
         }
       })
-
       const response = await apiClient.get(`/products?${params.toString()}`)
       return { success: true, data: response.data }
     } catch (error) {
@@ -93,29 +91,15 @@ export const productsService = {
     }
   },
 
-  // Actualizar código de barras de un producto
-  updateProductBarcode: async (id, codigoBarras) => {
+  // Obtener desglose de cálculo de precios de un producto
+  getProductPriceBreakdown: async (id) => {
     try {
-      const response = await apiClient.patch(`/products/${id}/barcode`, { codigoBarras })
+      const response = await apiClient.get(`/products/${id}/price-breakdown`)
       return { success: true, data: response.data }
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || "Error al actualizar código de barras",
-        error: error.response?.data,
-      }
-    }
-  },
-
-  // Buscar producto por código de barras
-  getProductByBarcode: async (barcode) => {
-    try {
-      const response = await apiClient.get(`/products/barcode/${barcode}`)
-      return { success: true, data: response.data }
-    } catch (error) {
-      return {
-        success: false,
-        message: error.response?.data?.message || "Error al buscar producto por código de barras",
+        message: error.response?.data?.message || "Error al obtener desglose de precios",
         error: error.response?.data,
       }
     }

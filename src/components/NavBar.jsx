@@ -66,13 +66,11 @@ const Navbar = () => {
   }
 
   const toggleDropdown = (dropdownName) => {
-    console.log("Toggle dropdown:", dropdownName, "Estado actual:", activeDropdown)
     setActiveDropdown(activeDropdown === dropdownName ? null : dropdownName)
   }
 
   // Reemplazar la función closeAllMenus existente:
   const closeAllMenus = () => {
-    console.log("Cerrando todos los menús")
     setIsMobileMenuOpen(false)
     setActiveDropdown(null)
   }
@@ -81,7 +79,6 @@ const Navbar = () => {
   const handleDropdownNavigation = (href, event) => {
     event.preventDefault()
     event.stopPropagation()
-    console.log("Navegando a:", href)
 
     // Resetear estados inmediatamente
     setActiveDropdown(null)
@@ -157,9 +154,6 @@ const Navbar = () => {
           {/* Logo y nombre de la empresa */}
           <div className="flex items-center flex-shrink-0 min-w-0">
             <Link to="/dashboard" className="flex items-center" onClick={closeAllMenus}>
-              <div className="w-9 h-9 bg-gradient-to-br from-slate-600 to-slate-800 rounded-lg flex items-center justify-center mr-3 shadow-lg border border-slate-600 flex-shrink-0">
-                <Car className="w-5 h-5 text-white" />
-              </div>
               <div className="hidden sm:block min-w-0">
                 <h1 className="text-lg font-bold text-white truncate">La Solución Repuestos</h1>
               </div>

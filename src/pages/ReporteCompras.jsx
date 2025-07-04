@@ -1,407 +1,899 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import {
-  BarChart3,
-  Eye,
-  Package,
-  Filter,
-  Download,
-  Printer,
-  RefreshCw,
-  Calendar,
-  TrendingUp,
-  ShoppingCart,
-  CheckCircle,
-  Clock,
-  XCircle,
-  AlertTriangle,
-} from "lucide-react"
-
 import Layout from "../components/Layout"
-import { useSuppliers } from "../hooks/useSuppliers"
-import { usePurchases } from "../hooks/usePurchase"
-import CompraDetailModal from "@/components/purchases/ComprasDetailsModal"
-import ReceiveProductsModal from "@/components/purchases/ReceiveProductsModal"
-import StatusUpdateModal from "@/components/purchases/StatusUpdateModal"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card"
+import { Button } from "../components/ui/button"
+import { Input } from "../components/ui/input"
+import { Label } from "../components/ui/label"
+import { Badge } from "../components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
+import {
+  Search,
+  Filter,
+  RefreshCw,
+  Download,
+  Eye,
+  FileText,
+  Building,
+  DollarSign,
+  ShoppingCart,
+  X,
+  ArrowUpRight,
+  ArrowDownRight,
+  Clock,
+  CreditCard,
+  Banknote,
+  Smartphone,
+  ChevronDown,
+  ChevronUp,
+  CalendarIcon,
+  AlertCircle,
+  CheckCircle2,
+  History,
+  PieChart,
+  Truck,
+  AlertTriangle,
+  XCircle,
+  Package,
+} from "lucide-react"
+import PurchaseDetailsModal from "../components/reportes-compras/PurchaseDetailsModal"
+import ReceiveProductsModal from "../components/reportes-compras/ReceiveProductsModal"
+import StatusUpdateModal from "../components/reportes-compras/StatusUpdateModal"
+import { usePurchasesReports } from "../hooks/usePurchasesReports"
+import { formatCurrency } from "../lib/utils"
+import { extractExactDateTime } from "../lib/date-utils"
+import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert"
 
-// Componente para formatear precios
-const PriceDisplay = ({ value, className = "" }) => {
-  return (
-    <span className={className}>
-      {new Intl.NumberFormat("es-AR", {
-        style: "currency",
-        currency: "ARS",
-        minimumFractionDigits: 2,
-      }).format(value || 0)}
-    </span>
-  )
-}
-
-// Componente de estadísticas
-const ComprasStats = ({ purchases }) => {
-  const stats = {
-    total: purchases.length,
-    pendientes: purchases.filter((p) => p.estado === "pendiente").length,
-    recibidas: purchases.filter((p) => p.estado === "recibida").length,
-    parciales: purchases.filter((p) => p.estado === "parcial").length,
-    canceladas: purchases.filter((p) => p.estado === "cancelada").length,
-    montoTotal: purchases.reduce((sum, p) => sum + Number.parseFloat(p.total || 0), 0),
-    montoMesActual: purchases
-      .filter((p) => {
-        const fecha = new Date(p.fecha_compra)
-        const hoy = new Date()
-        return fecha.getMonth() === hoy.getMonth() && fecha.getFullYear() === hoy.getFullYear()
-      })
-      .reduce((sum, p) => sum + Number.parseFloat(p.total || 0), 0),
-  }
-
-  const statCards = [
-    {
-      title: "Total Compras",
-      value: stats.total,
-      icon: ShoppingCart,
-      color: "bg-blue-500",
-      textColor: "text-blue-600",
-    },
-    {
-      title: "Pendientes",
-      value: stats.pendientes,
-      icon: Clock,
-      color: "bg-yellow-500",
-      textColor: "text-yellow-600",
-    },
-    {
-      title: "Recibidas",
-      value: stats.recibidas,
-      icon: CheckCircle,
-      color: "bg-green-500",
-      textColor: "text-green-600",
-    },
-    {
-      title: "Monto Total",
-      value: <PriceDisplay value={stats.montoTotal} />,
-      icon: TrendingUp,
-      color: "bg-purple-500",
-      textColor: "text-purple-600",
-    },
-  ]
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      {statCards.map((stat, index) => (
-        <Card key={index} className="shadow-sm border-0 ring-1 ring-gray-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">{stat.title}</p>
-                <p className={`text-2xl font-bold ${stat.textColor}`}>{stat.value}</p>
-              </div>
-              <div className={`p-3 rounded-lg ${stat.color}`}>
-                <stat.icon className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  )
-}
-
-// Componente de filtros
-const ComprasFilters = ({ filters, onFiltersChange, suppliers, onClearFilters }) => {
-  return (
-    <Card className="shadow-sm border-0 ring-1 ring-gray-200 mb-6">
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center space-x-2">
-          <Filter className="h-5 w-5 text-blue-600" />
-          <span>Filtros</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="space-y-2">
-            <Label>Proveedor</Label>
-            <Select value={filters.proveedor} onValueChange={(value) => onFiltersChange({ proveedor: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todos los proveedores" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los proveedores</SelectItem>
-                {suppliers.map((supplier) => (
-                  <SelectItem key={supplier.id} value={supplier.nombre}>
-                    {supplier.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Estado</Label>
-            <Select value={filters.estado} onValueChange={(value) => onFiltersChange({ estado: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todos los estados" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los estados</SelectItem>
-                <SelectItem value="pendiente">Pendiente</SelectItem>
-                <SelectItem value="parcial">Parcial</SelectItem>
-                <SelectItem value="recibida">Recibida</SelectItem>
-                <SelectItem value="cancelada">Cancelada</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Fecha Desde</Label>
-            <Input
-              type="date"
-              value={filters.fechaInicio}
-              onChange={(e) => onFiltersChange({ fechaInicio: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Fecha Hasta</Label>
-            <Input
-              type="date"
-              value={filters.fechaFin}
-              onChange={(e) => onFiltersChange({ fechaFin: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end mt-4 space-x-2">
-          <Button variant="outline" onClick={onClearFilters}>
-            Limpiar Filtros
-          </Button>
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Exportar
-          </Button>
-          <Button variant="outline">
-            <Printer className="h-4 w-4 mr-2" />
-            Imprimir
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-// Componente principal
-export default function ReporteCompras() {
-  const { suppliers } = useSuppliers()
-  const { purchases, loading, fetchPurchases, updatePurchaseStatus, receivePurchaseItems } = usePurchases()
-
-  // Estados para filtros
+const ReporteCompras = () => {
   const [filters, setFilters] = useState({
-    proveedor: "",
-    estado: "",
     fechaInicio: "",
     fechaFin: "",
+    proveedor: "",
+    numeroCompra: "",
+    estado: "todos",
+    tipoPago: "todos",
   })
 
-  // Estados para modales
-  const [detailModalOpen, setDetailModalOpen] = useState(false)
-  const [receiveModalOpen, setReceiveModalOpen] = useState(false)
-  const [statusModalOpen, setStatusModalOpen] = useState(false)
   const [selectedPurchase, setSelectedPurchase] = useState(null)
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false)
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [activeTab, setActiveTab] = useState("historial")
 
-  // Cargar compras al montar y cuando cambien los filtros
+  const {
+    purchases,
+    stats,
+    loading,
+    error,
+    fetchPurchases,
+    fetchStats,
+    exportPurchases,
+    getPurchaseById,
+    updatePurchaseStatus,
+    receivePurchaseItems,
+  } = usePurchasesReports()
+
+  // Cargar datos iniciales (últimos 30 días)
   useEffect(() => {
-    fetchPurchases(filters)
-  }, [filters, fetchPurchases])
+    const today = new Date()
+    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
 
-  // Manejar cambios en filtros
-  const handleFiltersChange = (newFilters) => {
-    setFilters((prev) => ({ ...prev, ...newFilters }))
+    const initialFilters = {
+      ...filters,
+      fechaInicio: thirtyDaysAgo.toISOString().split("T")[0],
+      fechaFin: today.toISOString().split("T")[0],
+    }
+
+    setFilters(initialFilters)
+    handleApplyFilters(initialFilters)
+  }, [])
+
+  const handleApplyFilters = async (customFilters = filters) => {
+    await Promise.all([fetchPurchases(customFilters), fetchStats(customFilters)])
   }
 
-  // Limpiar filtros
-  const handleClearFilters = () => {
-    setFilters({
-      proveedor: "",
-      estado: "",
+  const handleFilterChange = (field, value) => {
+    const newFilters = { ...filters, [field]: value }
+    setFilters(newFilters)
+
+    // Auto-aplicar filtros para búsqueda rápida
+    if (field === "proveedor" || field === "numeroCompra") {
+      const timeoutId = setTimeout(() => {
+        handleApplyFilters(newFilters)
+      }, 500)
+      return () => clearTimeout(timeoutId)
+    }
+  }
+
+  const handleQuickDateFilter = (days) => {
+    const today = new Date()
+    const startDate = new Date(today.getTime() - days * 24 * 60 * 60 * 1000)
+
+    const newFilters = {
+      ...filters,
+      fechaInicio: startDate.toISOString().split("T")[0],
+      fechaFin: today.toISOString().split("T")[0],
+    }
+
+    setFilters(newFilters)
+    handleApplyFilters(newFilters)
+  }
+
+  const handleResetFilters = () => {
+    const resetFilters = {
       fechaInicio: "",
       fechaFin: "",
-    })
+      proveedor: "",
+      numeroCompra: "",
+      estado: "todos",
+      tipoPago: "todos",
+    }
+    setFilters(resetFilters)
+    handleApplyFilters(resetFilters)
   }
 
-  // Abrir modal de detalle
-  const handleViewDetail = (purchase) => {
-    setSelectedPurchase(purchase)
-    setDetailModalOpen(true)
+  const handleViewPurchaseDetails = async (purchaseId) => {
+    const result = await getPurchaseById(purchaseId)
+    if (result.success) {
+      setSelectedPurchase(result.data)
+      setIsDetailsModalOpen(true)
+    }
   }
 
-  // Abrir modal de recepción
-  const handleReceiveProducts = (purchase) => {
-    setSelectedPurchase(purchase)
-    setReceiveModalOpen(true)
+  const handleReceiveProducts = async (purchaseId) => {
+    const result = await getPurchaseById(purchaseId)
+    if (result.success) {
+      setSelectedPurchase(result.data)
+      setIsReceiveModalOpen(true)
+    }
   }
 
-  // Abrir modal de cambio de estado
-  const handleChangeStatus = (purchase) => {
-    setSelectedPurchase(purchase)
-    setStatusModalOpen(true)
+  const handleChangeStatus = async (purchaseId) => {
+    const result = await getPurchaseById(purchaseId)
+    if (result.success) {
+      setSelectedPurchase(result.data)
+      setIsStatusModalOpen(true)
+    }
   }
 
-  // Obtener badge de estado
+  const handleExport = async () => {
+    await exportPurchases(filters)
+  }
+
+  // Función para determinar el método de pago principal
+  const getPaymentMethodDisplay = (purchase) => {
+    if (!purchase.pagos || purchase.pagos.length === 0) {
+      return {
+        type: "no_especificado",
+        label: "No especificado",
+        icon: AlertCircle,
+        color: "bg-gray-100 text-gray-800 border-gray-200",
+      }
+    }
+
+    // Si hay múltiples métodos de pago
+    if (purchase.pagos.length > 1) {
+      return {
+        type: "varios",
+        label: "Varios métodos",
+        icon: CreditCard,
+        color: "bg-indigo-100 text-indigo-800 border-indigo-200",
+      }
+    }
+
+    // Un solo método de pago
+    const pago = purchase.pagos[0]
+    const paymentConfigs = {
+      efectivo: {
+        label: "Efectivo",
+        icon: Banknote,
+        color: "bg-green-100 text-green-800 border-green-200",
+      },
+      tarjeta_credito: {
+        label: "Tarjeta Crédito",
+        icon: CreditCard,
+        color: "bg-blue-100 text-blue-800 border-blue-200",
+      },
+      tarjeta_debito: {
+        label: "Tarjeta Débito",
+        icon: CreditCard,
+        color: "bg-indigo-100 text-indigo-800 border-indigo-200",
+      },
+      transferencia: {
+        label: "Transferencia",
+        icon: Smartphone,
+        color: "bg-purple-100 text-purple-800 border-purple-200",
+      },
+      otro: {
+        label: "Otro",
+        icon: DollarSign,
+        color: "bg-gray-100 text-gray-800 border-gray-200",
+      },
+    }
+
+    return (
+      paymentConfigs[pago.tipo_pago] || {
+        label: "No especificado",
+        icon: AlertCircle,
+        color: "bg-gray-100 text-gray-800 border-gray-200",
+      }
+    )
+  }
+
+  // Función para obtener el badge de estado
   const getStatusBadge = (estado) => {
     const statusConfig = {
-      pendiente: { variant: "secondary", icon: Clock, color: "text-yellow-600" },
-      parcial: { variant: "secondary", icon: AlertTriangle, color: "text-orange-600" },
-      recibida: { variant: "secondary", icon: CheckCircle, color: "text-green-600" },
-      cancelada: { variant: "secondary", icon: XCircle, color: "text-red-600" },
+      pendiente: {
+        label: "Pendiente",
+        icon: Clock,
+        color: "border-yellow-200 text-yellow-700 bg-yellow-50",
+      },
+      parcial: {
+        label: "Parcial",
+        icon: AlertTriangle,
+        color: "border-orange-200 text-orange-700 bg-orange-50",
+      },
+      recibida: {
+        label: "Recibida",
+        icon: CheckCircle2,
+        color: "border-green-200 text-green-700 bg-green-50",
+      },
+      cancelada: {
+        label: "Cancelada",
+        icon: XCircle,
+        color: "border-red-200 text-red-700 bg-red-50",
+      },
     }
 
     const config = statusConfig[estado] || statusConfig.pendiente
-    const Icon = config.icon
+    const IconComponent = config.icon
 
     return (
-      <Badge variant={config.variant} className="flex items-center space-x-1">
-        <Icon className={`h-3 w-3 ${config.color}`} />
-        <span className="capitalize">{estado}</span>
+      <Badge variant="outline" className={config.color}>
+        <IconComponent className="w-3 h-3 mr-1" />
+        <span className="text-xs">{config.label}</span>
       </Badge>
     )
   }
 
+  // Calcular estadísticas adicionales
+  const calculateAdditionalStats = () => {
+    if (!stats) return {}
+
+    const comprasHoy = purchases.filter((purchase) => {
+      const today = new Date().toISOString().split("T")[0]
+      const purchaseDate = new Date(purchase.fecha_compra).toISOString().split("T")[0]
+      return purchaseDate === today && purchase.estado !== "cancelada"
+    }).length
+
+    const comprasAyer = purchases.filter((purchase) => {
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+      const purchaseDate = new Date(purchase.fecha_compra).toISOString().split("T")[0]
+      return purchaseDate === yesterday && purchase.estado !== "cancelada"
+    }).length
+
+    const crecimiento = comprasAyer > 0 ? ((comprasHoy - comprasAyer) / comprasAyer) * 100 : 0
+
+    return {
+      comprasHoy,
+      comprasAyer,
+      crecimiento,
+      ticketPromedio: stats.totalCompras > 0 ? (stats.montoTotal || 0) / stats.totalCompras : 0,
+    }
+  }
+
+  const additionalStats = calculateAdditionalStats()
+
   return (
     <Layout>
-      <div className="p-6 max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
-              <BarChart3 className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Reporte de Compras</h1>
-              <p className="text-gray-600">Gestione y analice todas las compras realizadas</p>
+      <div className="min-h-screen bg-gray-50/50">
+        <div className="container mx-auto p-4 md:p-6 lg:p-8 max-w-[95rem]">
+          {/* Header */}
+          <div className="mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">Reportes de Compras</h1>
+                <p className="text-muted-foreground mt-2">
+                  Análisis detallado de compras, gestión de proveedores y control de inventario
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={() => setShowFilters(!showFilters)} variant="outline" disabled={loading}>
+                  <Filter className="w-4 h-4 mr-2" />
+                  Filtros
+                  {showFilters ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}
+                </Button>
+                <Button onClick={handleExport} variant="outline" disabled={loading}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Exportar
+                </Button>
+                <Button onClick={() => handleApplyFilters()} disabled={loading} className="bg-slate-800 hover:bg-slate-900">
+                  <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                  Actualizar
+                </Button>
+              </div>
             </div>
           </div>
-          <Button onClick={() => fetchPurchases(filters)} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-            Actualizar
-          </Button>
-        </div>
 
-        {/* Estadísticas */}
-        <ComprasStats purchases={purchases} />
+          {/* Filtros */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Search className="w-5 h-5" />
+                Filtros y Búsqueda
+              </CardTitle>
+              <CardDescription>Filtra las compras por período, proveedor, estado y método de pago</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Búsqueda rápida */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="proveedor">Buscar proveedor</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                      <Input
+                        id="proveedor"
+                        placeholder="Nombre del proveedor..."
+                        value={filters.proveedor}
+                        onChange={(e) => handleFilterChange("proveedor", e.target.value)}
+                        className="pl-10 border-slate-800" 
+                      />
+                    </div>
+                  </div>
 
-        {/* Filtros */}
-        <ComprasFilters
-          filters={filters}
-          onFiltersChange={handleFiltersChange}
-          suppliers={suppliers}
-          onClearFilters={handleClearFilters}
-        />
+                  <div className="space-y-2">
+                    <Label htmlFor="numeroCompra">Número de compra</Label>
+                    <div className="relative">
+                      <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                      <Input
+                        id="numeroCompra"
+                        placeholder="Número de compra..."
+                        value={filters.numeroCompra}
+                        onChange={(e) => handleFilterChange("numeroCompra", e.target.value)}
+                        className="pl-10 border-slate-800"
+                      />
+                    </div>
+                  </div>
 
-        {/* Tabla de compras */}
-        <Card className="shadow-sm border-0 ring-1 ring-gray-200">
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center justify-between">
-              <span>Compras ({purchases.length})</span>
-              {loading && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {purchases.length > 0 ? (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Número</TableHead>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Proveedor</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Items</TableHead>
-                      <TableHead>Total</TableHead>
-                      <TableHead>Usuario</TableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {purchases.map((purchase) => (
-                      <TableRow key={purchase.id} className="hover:bg-gray-50">
-                        <TableCell className="font-medium">{purchase.numero_compra}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            <Calendar className="h-4 w-4 text-gray-400" />
-                            <span>{new Date(purchase.fecha_compra).toLocaleDateString("es-AR")}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>{purchase.proveedor_nombre}</TableCell>
-                        <TableCell>{getStatusBadge(purchase.estado)}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{purchase.total_items} items</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <PriceDisplay value={purchase.total} className="font-semibold text-green-600" />
-                        </TableCell>
-                        <TableCell className="text-sm text-gray-600">{purchase.usuario_nombre}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end space-x-2">
-                            <Button variant="ghost" size="sm" onClick={() => handleViewDetail(purchase)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {(purchase.estado === "pendiente" || purchase.estado === "parcial") && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleReceiveProducts(purchase)}
-                                className="text-blue-600 hover:text-blue-700"
-                              >
-                                <Package className="h-4 w-4" />
-                              </Button>
+                  <div className="space-y-2">
+                    <Label>Períodos rápidos</Label>
+                    <div className="flex gap-2">
+                      <Button onClick={() => handleQuickDateFilter(7)} variant="outline" size="sm" className="flex-1 h-10 border-slate-800">
+                        <Clock className="w-4 h-4 mr-1" />7 días
+                      </Button>
+                      <Button onClick={() => handleQuickDateFilter(30)} variant="outline" size="sm" className="flex-1 h-10 border-slate-800">
+                        30 días
+                      </Button>
+                      <Button onClick={() => handleQuickDateFilter(90)} variant="outline" size="sm" className="flex-1 h-10 border-slate-800">
+                        90 días
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filtros avanzados */}
+                {showFilters && (
+                  <div className="border-t pt-4 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="fechaInicio">Fecha inicio</Label>
+                        <div className="relative">
+                          <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                          <Input
+                            id="fechaInicio"
+                            type="date"
+                            value={filters.fechaInicio}
+                            onChange={(e) => handleFilterChange("fechaInicio", e.target.value)}
+                            className="pl-10"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="fechaFin">Fecha fin</Label>
+                        <div className="relative">
+                          <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                          <Input
+                            id="fechaFin"
+                            type="date"
+                            value={filters.fechaFin}
+                            onChange={(e) => handleFilterChange("fechaFin", e.target.value)}
+                            className="pl-10"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="estado">Estado</Label>
+                        <select
+                          id="estado"
+                          value={filters.estado}
+                          onChange={(e) => handleFilterChange("estado", e.target.value)}
+                          className="w-full h-10 px-3 border border-input rounded-md text-sm focus:border-ring focus:ring-ring/20"
+                        >
+                          <option value="todos">Todos los estados</option>
+                          <option value="pendiente">Pendientes</option>
+                          <option value="parcial">Parciales</option>
+                          <option value="recibida">Recibidas</option>
+                          <option value="cancelada">Canceladas</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="tipoPago">Método de pago</Label>
+                        <select
+                          id="tipoPago"
+                          value={filters.tipoPago}
+                          onChange={(e) => handleFilterChange("tipoPago", e.target.value)}
+                          className="w-full h-10 px-3 border border-input rounded-md text-sm focus:border-ring focus:ring-ring/20"
+                        >
+                          <option value="todos">Todos los métodos</option>
+                          <option value="efectivo">Efectivo</option>
+                          <option value="tarjeta_credito">Tarjeta Crédito</option>
+                          <option value="tarjeta_debito">Tarjeta Débito</option>
+                          <option value="transferencia">Transferencia</option>
+                          <option value="varios">Varios métodos</option>
+                          <option value="otro">Otro</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-4 border-t">
+                      <div className="text-sm text-muted-foreground">
+                        {purchases.length} compra{purchases.length !== 1 ? "s" : ""} encontrada
+                        {purchases.length !== 1 ? "s" : ""}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button onClick={handleResetFilters} variant="outline" size="sm">
+                          <X className="w-4 h-4 mr-2" />
+                          Limpiar Filtros
+                        </Button>
+                        <Button onClick={() => handleApplyFilters()} size="sm">
+                          <Filter className="w-4 h-4 mr-2" />
+                          Aplicar Filtros
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {error && (
+                  <Alert className="border-red-200 bg-red-50">
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                    <AlertTitle className="text-red-900">Error</AlertTitle>
+                    <AlertDescription className="text-red-800">{error}</AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tabs para separar Historial y Reportes */}
+          <Tabs defaultValue="historial" value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid grid-cols-2 mb-6 w-full max-w-md">
+              <TabsTrigger value="historial" className="flex items-center gap-2">
+                <History className="w-4 h-4" />
+                Historial de Compras
+              </TabsTrigger>
+              <TabsTrigger value="reportes" className="flex items-center gap-2">
+                <PieChart className="w-4 h-4" />
+                Reportes
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Tab de Historial de Compras */}
+            <TabsContent value="historial" className="mt-0">
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="w-5 h-5" />
+                        Historial de Compras
+                      </CardTitle>
+                      <CardDescription>
+                        {purchases.length} registro{purchases.length !== 1 ? "s" : ""} encontrado
+                        {purchases.length !== 1 ? "s" : ""}
+                      </CardDescription>
+                    </div>
+                    <Badge variant="outline" className="w-fit">
+                      Total: {purchases.length}
+                    </Badge>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="-mt-3">
+                  {loading ? (
+                    <div className="flex flex-col items-center justify-center py-16">
+                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
+                      <p className="text-muted-foreground font-medium">Cargando compras...</p>
+                      <p className="text-sm text-muted-foreground mt-1">Esto puede tomar unos segundos</p>
+                    </div>
+                  ) : purchases.length === 0 ? (
+                    <div className="text-center py-16">
+                      <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                      <h3 className="text-lg font-medium text-muted-foreground mb-2">No se encontraron compras</h3>
+                      <p className="text-muted-foreground mb-4">
+                        No hay compras que coincidan con los filtros aplicados
+                      </p>
+                      <Button onClick={handleResetFilters} variant="outline" size="sm">
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Limpiar filtros
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-slate-800">
+                          <tr className="border-b">
+                            <th className="text-slate-100 text-left py-3 px-4 font-medium text-muted-foreground">Número</th>
+                            <th className="text-slate-100 text-left py-3 px-4 font-medium text-muted-foreground">Fecha</th>
+                            <th className="text-slate-100 text-left py-3 px-4 font-medium text-muted-foreground">Proveedor</th>
+                            <th className="text-slate-100 text-left py-3 px-4 font-medium text-muted-foreground">Total</th>
+                            <th className="text-slate-100 text-center py-3 px-4 font-medium text-muted-foreground">Método de Pago</th>
+                            <th className="text-slate-100 text-center py-3 px-4 font-medium text-muted-foreground">Estado</th>
+                            <th className="text-slate-100 text-center py-3 px-4 font-medium text-muted-foreground">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {purchases.map((purchase, index) => {
+                            const paymentMethod = getPaymentMethodDisplay(purchase)
+                            const IconComponent = paymentMethod.icon
+                            const dateTime = extractExactDateTime(purchase.fecha_creacion)
+
+                            return (
+                              <tr key={purchase.id} className="border-b hover:bg-muted/50 transition-colors">
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-2">
+                                    <FileText className="w-4 h-4 text-muted-foreground" />
+                                    <span className="font-mono font-medium text-sm">{purchase.numero_compra}</span>
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4">
+                                  <div>
+                                    <span className="text-sm font-medium">{dateTime.date}</span>
+                                    <p className="text-xs text-muted-foreground">{dateTime.time}</p>
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-2">
+                                    <Building className="w-4 h-4 text-muted-foreground" />
+                                    <span className="text-sm truncate max-w-xs">
+                                      {purchase.proveedor_nombre || "Proveedor no especificado"}
+                                    </span>
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4">
+                                  <div>
+                                    <span className="font-bold text-green-600">
+                                      {formatCurrency(Number(purchase.total) || 0)}
+                                    </span>
+                                    {Number(purchase.descuento) > 0 && (
+                                      <p className="text-xs text-red-600 mt-1">
+                                        Desc: -{formatCurrency(Number(purchase.descuento))}
+                                      </p>
+                                    )}
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4 text-center">
+                                  <Badge variant="outline" className={paymentMethod.color}>
+                                    <div className="flex items-center gap-1">
+                                      <IconComponent className="w-3 h-3" />
+                                      <span className="text-xs">{paymentMethod.label}</span>
+                                    </div>
+                                  </Badge>
+                                </td>
+
+                                <td className="py-3 px-4 text-center">{getStatusBadge(purchase.estado)}</td>
+
+                                <td className="py-3 px-4 text-center">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleViewPurchaseDetails(purchase.id)}
+                                      className="h-8 w-8 p-0"
+                                      title="Ver detalles"
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </Button>
+                                    {(purchase.estado === "pendiente" || purchase.estado === "parcial") && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleReceiveProducts(purchase.id)}
+                                        className="h-8 w-8 p-0 border-green-200 text-green-600 hover:bg-green-50 hover:border-green-300"
+                                        title="Recibir productos"
+                                      >
+                                        <Truck className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Tab de Reportes */}
+            <TabsContent value="reportes" className="mt-0">
+              {/* Estadísticas */}
+              {stats ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                  {/* Total Compras */}
+                  <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-blue-700">Total Compras</p>
+                          <p className="text-3xl font-bold text-blue-900">{stats.totalCompras || 0}</p>
+                          <div className="flex items-center mt-2">
+                            <span className="text-xs text-blue-600">{additionalStats.comprasHoy} hoy</span>
+                            {additionalStats.crecimiento !== 0 && (
+                              <div className="flex items-center ml-2">
+                                {additionalStats.crecimiento >= 0 ? (
+                                  <ArrowUpRight className="w-3 h-3 text-green-600 mr-1" />
+                                ) : (
+                                  <ArrowDownRight className="w-3 h-3 text-red-600 mr-1" />
+                                )}
+                                <span
+                                  className={`text-xs ${
+                                    additionalStats.crecimiento >= 0 ? "text-green-600" : "text-red-600"
+                                  }`}
+                                >
+                                  {Math.abs(additionalStats.crecimiento).toFixed(1)}%
+                                </span>
+                              </div>
                             )}
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                        </div>
+                        <div className="p-3 bg-blue-500 rounded-full">
+                          <ShoppingCart className="w-6 h-6 text-white" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Monto Total */}
+                  <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-green-700">Inversión Total</p>
+                          <p className="text-2xl font-bold text-green-900">{formatCurrency(stats.montoTotal || 0)}</p>
+                          <p className="text-xs text-green-600 mt-2">
+                            Promedio: {formatCurrency(additionalStats.ticketPromedio)}
+                          </p>
+                        </div>
+                        <div className="p-3 bg-green-500 rounded-full">
+                          <DollarSign className="w-6 h-6 text-white" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Compras Recibidas */}
+                  <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-emerald-700">Recibidas</p>
+                          <p className="text-3xl font-bold text-emerald-900">{stats.comprasRecibidas || 0}</p>
+                          <p className="text-xs text-emerald-600 mt-2">
+                            {stats.totalCompras > 0
+                              ? (((stats.comprasRecibidas || 0) / stats.totalCompras) * 100).toFixed(1)
+                              : 0}
+                            % del total
+                          </p>
+                        </div>
+                        <div className="p-3 bg-emerald-500 rounded-full">
+                          <CheckCircle2 className="w-6 h-6 text-white" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Compras Pendientes */}
+                  <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-yellow-700">Pendientes</p>
+                          <p className="text-3xl font-bold text-yellow-900">{stats.comprasPendientes || 0}</p>
+                          <p className="text-xs text-yellow-600 mt-2">
+                            {stats.totalCompras > 0
+                              ? (((stats.comprasPendientes || 0) / stats.totalCompras) * 100).toFixed(1)
+                              : 0}
+                            % del total
+                          </p>
+                        </div>
+                        <div className="p-3 bg-yellow-500 rounded-full">
+                          <Clock className="w-6 h-6 text-white" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
+                  <p className="text-muted-foreground font-medium">Cargando estadísticas...</p>
+                  <p className="text-sm text-muted-foreground mt-1">Esto puede tomar unos segundos</p>
+                </div>
+              )}
+
+              {/* Gráficos y estadísticas adicionales */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Métodos de pago */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CreditCard className="w-5 h-5" />
+                      Métodos de Pago
+                    </CardTitle>
+                    <CardDescription>Distribución de métodos de pago utilizados</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {stats && stats.metodos_pago && stats.metodos_pago.length > 0 ? (
+                      <div className="space-y-4">
+                        {stats.metodos_pago.map((metodo, index) => {
+                          const paymentType = formatPaymentType(metodo.tipo_pago)
+                          const PaymentIcon = paymentType.icon
+                          const percentage = stats.montoTotal
+                            ? ((metodo.total_monto / stats.montoTotal) * 100).toFixed(1)
+                            : 0
+
+                          return (
+                            <div key={index} className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <div className={`p-2 rounded-lg ${paymentType.bgColor}`}>
+                                  <PaymentIcon className={`w-4 h-4 ${paymentType.color}`} />
+                                </div>
+                                <div>
+                                  <p className="font-medium">{paymentType.label}</p>
+                                  <p className="text-xs text-muted-foreground">{metodo.cantidad_usos} transacciones</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-semibold">{formatCurrency(metodo.total_monto)}</p>
+                                <p className="text-xs text-muted-foreground">{percentage}% del total</p>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <CreditCard className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                        <p className="text-muted-foreground">No hay datos disponibles</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Top proveedores */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Building className="w-5 h-5" />
+                      Top Proveedores
+                    </CardTitle>
+                    <CardDescription>Proveedores con mayor volumen de compras</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {stats && stats.top_proveedores && stats.top_proveedores.length > 0 ? (
+                      <div className="space-y-4">
+                        {stats.top_proveedores.slice(0, 5).map((proveedor, index) => (
+                          <div key={index} className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <div className="p-2 bg-blue-100 rounded-lg">
+                                <span className="font-bold text-blue-700">{index + 1}</span>
+                              </div>
+                              <div>
+                                <p className="font-medium">{proveedor.nombre}</p>
+                                <p className="text-xs text-muted-foreground">{proveedor.cantidad_compras} compras</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold">{formatCurrency(proveedor.total_comprado)}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <Building className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                        <p className="text-muted-foreground">No hay datos disponibles</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
-            ) : (
-              <div className="text-center py-12">
-                <BarChart3 className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No hay compras</h3>
-                <p className="text-gray-500">No se encontraron compras con los filtros aplicados.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </TabsContent>
+          </Tabs>
 
-        {/* Modales */}
-        <CompraDetailModal
-          isOpen={detailModalOpen}
-          onClose={() => setDetailModalOpen(false)}
-          purchase={selectedPurchase}
-          onStatusChange={handleChangeStatus}
-        />
+          {/* Modales */}
+          <PurchaseDetailsModal
+            isOpen={isDetailsModalOpen}
+            onClose={() => setIsDetailsModalOpen(false)}
+            purchase={selectedPurchase}
+            onStatusChange={handleChangeStatus}
+          />
 
-        <ReceiveProductsModal
-          isOpen={receiveModalOpen}
-          onClose={() => setReceiveModalOpen(false)}
-          purchase={selectedPurchase}
-          onReceive={receivePurchaseItems}
-        />
+          <ReceiveProductsModal
+            isOpen={isReceiveModalOpen}
+            onClose={() => setIsReceiveModalOpen(false)}
+            purchase={selectedPurchase}
+            onReceive={receivePurchaseItems}
+          />
 
-        <StatusUpdateModal
-          isOpen={statusModalOpen}
-          onClose={() => setStatusModalOpen(false)}
-          purchase={selectedPurchase}
-          onUpdate={updatePurchaseStatus}
-        />
+          <StatusUpdateModal
+            isOpen={isStatusModalOpen}
+            onClose={() => setIsStatusModalOpen(false)}
+            purchase={selectedPurchase}
+            onUpdate={updatePurchaseStatus}
+          />
+        </div>
       </div>
     </Layout>
   )
 }
+
+// Función auxiliar para formatear tipos de pago
+const formatPaymentType = (type) => {
+  const types = {
+    efectivo: {
+      label: "Efectivo",
+      icon: Banknote,
+      color: "text-green-600",
+      bgColor: "bg-green-100",
+    },
+    tarjeta_credito: {
+      label: "Tarjeta Crédito",
+      icon: CreditCard,
+      color: "text-blue-600",
+      bgColor: "bg-blue-100",
+    },
+    tarjeta_debito: {
+      label: "Tarjeta Débito",
+      icon: CreditCard,
+      color: "text-indigo-600",
+      bgColor: "bg-indigo-100",
+    },
+    transferencia: {
+      label: "Transferencia",
+      icon: Smartphone,
+      color: "text-purple-600",
+      bgColor: "bg-purple-100",
+    },
+    otro: {
+      label: "Otro",
+      icon: DollarSign,
+      color: "text-gray-600",
+      bgColor: "bg-gray-100",
+    },
+  }
+  return (
+    types[type] || {
+      label: type || "No especificado",
+      icon: DollarSign,
+      color: "text-gray-600",
+      bgColor: "bg-gray-100",
+    }
+  )
+}
+
+export default ReporteCompras

@@ -100,19 +100,21 @@ const Compras = () => {
     setFormData((prev) => ({ ...prev, subtotal, total }))
   }
 
-  const addProductToCart = (product) => {
+  // CORREGIDO: Función para agregar producto al carrito con cantidad especificada
+  const addProductToCart = (product, quantity = 1) => {
     const existingProduct = cartProducts.find((p) => p.id === product.id)
     if (existingProduct) {
-      updateProductQuantity(product.id, existingProduct.quantity + 1)
+      updateProductQuantity(product.id, existingProduct.quantity + quantity)
     } else {
       const productWithDefaults = {
         ...product,
-        quantity: 1,
+        quantity: quantity, // CORREGIDO: Usar la cantidad especificada
         precio_costo: product.precio_costo || 0,
+        precio_costo_original: product.precio_costo || 0, // NUEVO: Guardar precio original
       }
       setCartProducts((prev) => [...prev, productWithDefaults])
     }
-    toast.success(`${product.nombre} agregado al carrito`)
+    toast.success(`${product.nombre} agregado al carrito (${quantity} unidades)`) // CORREGIDO: Mostrar cantidad correcta
   }
 
   const updateProductQuantity = (productId, newQuantity) => {
@@ -274,7 +276,7 @@ const Compras = () => {
 
   return (
     <Layout>
-      <div className="max-w-[95rem] mx-auto px-4 py-6 min-h-screen">
+      <div className="max-w-[95rem] mx-auto px-4 py-6 min-h-screen ">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Columna Principal */}
           <div className="lg:col-span-2 space-y-6">

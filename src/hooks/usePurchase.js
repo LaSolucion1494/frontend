@@ -113,7 +113,7 @@ export const usePurchases = (initialFilters = {}) => {
               subtotal_formatted: purchasesService.formatCurrency(detalle.subtotal),
             })) || [],
 
-          // NUEVO: Formatear pagos
+          // Formatear pagos
           pagos:
             result.data.pagos?.map((pago) => ({
               ...pago,
@@ -137,7 +137,7 @@ export const usePurchases = (initialFilters = {}) => {
     }
   }
 
-  // Crear una nueva compra (ACTUALIZADO para manejar múltiples pagos)
+  // Crear una nueva compra
   const createPurchase = async (purchaseData) => {
     setLoading(true)
     setValidationErrors([])
@@ -247,53 +247,9 @@ export const usePurchases = (initialFilters = {}) => {
     }
   }
 
-  // Actualizar estado de una compra
-  const updatePurchaseStatus = async (purchaseId, statusData) => {
-    if (!purchaseId || purchaseId < 1) {
-      toast.error("ID de compra inválido")
-      return { success: false, message: "ID de compra inválido" }
-    }
-
-    setLoading(true)
-    try {
-      const result = await purchasesService.updatePurchaseStatus(purchaseId, statusData)
-
-      if (result.success) {
-        toast.success(result.message || "Estado actualizado exitosamente")
-
-        // Recargar datos relevantes
-        await Promise.all([
-          fetchPurchases({ silent: true }),
-          fetchTodaySummary({ silent: true }),
-          purchaseStats ? fetchPurchaseStats({ silent: true }) : Promise.resolve(),
-        ])
-
-        return {
-          success: true,
-          data: result.data,
-          message: result.message,
-        }
-      } else {
-        toast.error(result.message)
-        return {
-          success: false,
-          message: result.message,
-        }
-      }
-    } catch (error) {
-      const message = error.message || "Error al actualizar estado"
-      toast.error(message)
-      return {
-        success: false,
-        message,
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
   // Cancelar una compra
-  const cancelPurchase = async (purchaseId) => {
+  const cancelPurchase = async (purchaseId, motivo) => {
+    // ADDED motivo parameter
     if (!purchaseId || purchaseId < 1) {
       toast.error("ID de compra inválido")
       return { success: false, message: "ID de compra inválido" }
@@ -301,7 +257,7 @@ export const usePurchases = (initialFilters = {}) => {
 
     setLoading(true)
     try {
-      const result = await purchasesService.cancelPurchase(purchaseId)
+      const result = await purchasesService.cancelPurchase(purchaseId, motivo) // Pass motivo
 
       if (result.success) {
         toast.success(result.message || "Compra cancelada exitosamente")
@@ -337,7 +293,7 @@ export const usePurchases = (initialFilters = {}) => {
     }
   }
 
-  // Validar datos de compra (ACTUALIZADO para incluir validación de pagos mejorada)
+  // Validar datos de compra
   const validatePurchaseData = (purchaseData) => {
     const errors = []
 
@@ -345,7 +301,7 @@ export const usePurchases = (initialFilters = {}) => {
     const productErrors = purchasesService.validateProducts(purchaseData.productos || [])
     errors.push(...productErrors)
 
-    // ACTUALIZADO: Validar pagos con el total correcto (incluyendo intereses/descuentos)
+    // Validar pagos con el total correcto (incluyendo intereses/descuentos)
     const paymentErrors = purchasesService.validatePayments(purchaseData.pagos || [], purchaseData.total || 0)
     errors.push(...paymentErrors)
 
@@ -371,13 +327,18 @@ export const usePurchases = (initialFilters = {}) => {
       errors.push("Debe seleccionar un proveedor")
     }
 
+    // Validar fecha
+    if (!purchaseData.fechaCompra) {
+      errors.push("La fecha de compra es requerida")
+    }
+
     return {
       isValid: errors.length === 0,
       errors,
     }
   }
 
-  // Preparar datos de compra desde el formulario (ACTUALIZADO para múltiples pagos y cálculo correcto)
+  // Preparar datos de compra desde el formulario
   const preparePurchaseDataFromForm = useCallback(
     (formData, cartProducts, payments, proveedorSeleccionado, recibirInmediatamente = false) => {
       // Convertir productos del carrito al formato esperado por la API
@@ -387,14 +348,14 @@ export const usePurchases = (initialFilters = {}) => {
         precioUnitario: product.precio_costo,
       }))
 
-      // ACTUALIZADO: Convertir pagos al formato esperado por la API
+      // Convertir pagos al formato esperado por la API
       const pagos = payments.map((payment) => ({
         tipo: payment.type,
         monto: Number.parseFloat(payment.amount),
         descripcion: payment.description || "",
       }))
 
-      // CORREGIDO: Calcular subtotal, descuento e interés correctamente
+      // Calcular subtotal, descuento e interés correctamente
       const subtotal = formData.subtotal
       let descuento = 0
       let interes = 0
@@ -403,35 +364,31 @@ export const usePurchases = (initialFilters = {}) => {
         if (formData.isInterest) {
           // Es un interés
           interes =
-            formData.interestDiscountType === "percentage"
-              ? (subtotal * Number.parseFloat(formData.interestDiscount)) / 100
-              : Number.parseFloat(formData.interestDiscount)
+            formData.interestDiscountType === "percentage" // Corrected from interestDisc to interestDiscountType
+              ? (subtotal * Number.parseFloat(formData.interestDiscount)) / 100 // Parse float
+              : Number.parseFloat(formData.interestDiscount) // Parse float
         } else {
           // Es un descuento
           descuento =
-            formData.interestDiscountType === "percentage"
-              ? (subtotal * Number.parseFloat(formData.interestDiscount)) / 100
-              : Number.parseFloat(formData.interestDiscount)
+            formData.interestDiscountType === "percentage" // Corrected from interestDisc to interestDiscountType
+              ? (subtotal * Number.parseFloat(formData.interestDiscount)) / 100 // Parse float
+              : Number.parseFloat(formData.interestDiscount) // Parse float
         }
       }
 
-      // IMPORTANTE: Usar el total final del formulario que ya incluye intereses/descuentos
-      const totalFinal = formData.total
+      const total = subtotal - descuento + interes
 
-      // Crear objeto de compra
       return {
         proveedorId: proveedorSeleccionado?.id || 1,
         productos,
         subtotal,
         descuento,
         interes,
-        total: totalFinal, // Este es el total final que incluye intereses/descuentos
-        observaciones: formData.notes || "",
+        total,
+        observaciones: formData.notes || "", // Corrected from observaciones to notes
         fechaCompra: formData.fechaCompra || new Date().toISOString().split("T")[0],
+        pagos,
         recibirInmediatamente,
-        pagos, // NUEVO: Incluir pagos
-        // Información adicional para validaciones
-        selectedSupplier: proveedorSeleccionado,
       }
     },
     [],
@@ -446,22 +403,8 @@ export const usePurchases = (initialFilters = {}) => {
         const result = await purchasesService.getPurchaseStats(finalFilters)
 
         if (result.success) {
-          const formattedStats = {
-            ...result.data,
-            // Formatear estadísticas generales
-            estadisticas_generales: {
-              ...result.data.estadisticas_generales,
-              total_comprado_formatted: purchasesService.formatCurrency(
-                result.data.estadisticas_generales?.total_comprado || 0,
-              ),
-              promedio_compra_formatted: purchasesService.formatCurrency(
-                result.data.estadisticas_generales?.promedio_compra || 0,
-              ),
-            },
-          }
-
-          setPurchaseStats(formattedStats)
-          return { success: true, data: formattedStats }
+          setPurchaseStats(result.data)
+          return { success: true, data: result.data }
         } else {
           if (!customFilters.silent) {
             toast.error(result.message)
@@ -469,7 +412,7 @@ export const usePurchases = (initialFilters = {}) => {
           return { success: false, message: result.message }
         }
       } catch (error) {
-        const message = "Error al obtener estadísticas de compras"
+        const message = "Error al obtener estadísticas"
         if (!customFilters.silent) {
           toast.error(message)
         }
@@ -481,23 +424,21 @@ export const usePurchases = (initialFilters = {}) => {
     [filters],
   )
 
-  // Obtener resumen del día
+  // Obtener resumen del día actual
   const fetchTodaySummary = useCallback(async (customFilters = {}) => {
-    setLoading(true)
+    const today = new Date().toISOString().split("T")[0]
+    const todayFilters = {
+      fechaInicio: today,
+      fechaFin: today,
+      ...customFilters,
+    }
+
     try {
-      const result = await purchasesService.getTodayPurchasesSummary()
+      const result = await purchasesService.getPurchaseStats(todayFilters)
 
       if (result.success) {
-        const formattedSummary = {
-          ...result.data,
-          resumen: {
-            ...result.data.resumen,
-            total_comprado_formatted: purchasesService.formatCurrency(result.data.resumen?.total_comprado || 0),
-          },
-        }
-
-        setTodaySummary(formattedSummary)
-        return { success: true, data: formattedSummary }
+        setTodaySummary(result.data)
+        return { success: true, data: result.data }
       } else {
         if (!customFilters.silent) {
           toast.error(result.message)
@@ -510,54 +451,7 @@ export const usePurchases = (initialFilters = {}) => {
         toast.error(message)
       }
       return { success: false, message }
-    } finally {
-      setLoading(false)
     }
-  }, [])
-
-  // NUEVA: Obtener estadísticas de métodos de pago
-  const fetchPaymentStats = useCallback(
-    async (customFilters = {}) => {
-      setLoading(true)
-      try {
-        const finalFilters = { ...filters, ...customFilters }
-        const result = await purchasesService.getPurchasePaymentStats(finalFilters)
-
-        if (result.success) {
-          return { success: true, data: result.data }
-        } else {
-          if (!customFilters.silent) {
-            toast.error(result.message)
-          }
-          return { success: false, message: result.message }
-        }
-      } catch (error) {
-        const message = "Error al obtener estadísticas de métodos de pago"
-        if (!customFilters.silent) {
-          toast.error(message)
-        }
-        return { success: false, message }
-      } finally {
-        setLoading(false)
-      }
-    },
-    [filters],
-  )
-
-  // Calcular totales de compra
-  const calculatePurchaseTotals = useCallback((productos, descuento = 0, interes = 0) => {
-    return purchasesService.calculatePurchaseTotals(productos, descuento, interes)
-  }, [])
-
-  // Obtener tipos de pago disponibles (sin cuenta corriente para compras)
-  const getPaymentTypes = useCallback(() => {
-    return purchasesService.getPaymentTypes()
-  }, [])
-
-  // Limpiar compra en progreso
-  const clearPurchaseInProgress = useCallback(() => {
-    setPurchaseInProgress(null)
-    setValidationErrors([])
   }, [])
 
   // Actualizar filtros
@@ -567,85 +461,59 @@ export const usePurchases = (initialFilters = {}) => {
 
   // Limpiar filtros
   const clearFilters = useCallback(() => {
-    setFilters({
+    const clearedFilters = {
       fechaInicio: "",
       fechaFin: "",
       proveedor: "",
       estado: "todos",
       limit: 50,
       offset: 0,
-    })
-  }, [])
-
-  // Calcular estadísticas locales
-  const getLocalStats = useCallback(() => {
-    if (!purchases || purchases.length === 0) return null
-
-    const totalCompras = purchases.length
-    const comprasCompletadas = purchases.filter((purchase) => purchase.estado === "recibida").length
-    const comprasPendientes = purchases.filter((purchase) => purchase.estado === "pendiente").length
-    const comprasCanceladas = purchases.filter((purchase) => purchase.estado === "cancelada").length
-
-    const totalComprado = purchases
-      .filter((purchase) => purchase.estado === "recibida")
-      .reduce((sum, purchase) => sum + purchase.total, 0)
-
-    return {
-      totalCompras,
-      comprasCompletadas,
-      comprasPendientes,
-      comprasCanceladas,
-      totalComprado,
-      promedioCompra: comprasCompletadas > 0 ? totalComprado / comprasCompletadas : 0,
-      // Formateo para UI
-      totalComprado_formatted: purchasesService.formatCurrency(totalComprado),
-      promedioCompra_formatted: purchasesService.formatCurrency(
-        comprasCompletadas > 0 ? totalComprado / comprasCompletadas : 0,
-      ),
     }
-  }, [purchases])
-
-  // Formatear moneda
-  const formatCurrency = useCallback((amount) => {
-    return purchasesService.formatCurrency(amount)
+    setFilters(clearedFilters)
+    return clearedFilters
   }, [])
 
-  // Formatear fecha
-  const formatDate = useCallback((date) => {
-    return purchasesService.formatDate(date)
+  // Limpiar errores
+  const clearErrors = useCallback(() => {
+    setError(null)
+    setValidationErrors([])
   }, [])
 
-  // NUEVA: Validar pagos antes de confirmar
-  const validatePaymentsBeforeConfirm = useCallback((payments, total) => {
-    const errors = purchasesService.validatePayments(payments, total)
-    return {
-      isValid: errors.length === 0,
-      errors,
+  // Limpiar compra seleccionada
+  const clearSelectedPurchase = useCallback(() => {
+    setSelectedPurchase(null)
+  }, [])
+
+  // Reintentar compra en progreso
+  const retryPurchaseInProgress = useCallback(async () => {
+    if (purchaseInProgress) {
+      return await createPurchase(purchaseInProgress)
     }
-  }, [])
+    return { success: false, message: "No hay compra en progreso para reintentar" }
+  }, [purchaseInProgress])
 
-  // NUEVA: Calcular total de pagos
-  const calculatePaymentsTotal = useCallback((payments) => {
-    return payments.reduce((sum, payment) => sum + Number.parseFloat(payment.amount || 0), 0)
+  // Limpiar compra en progreso
+  const clearPurchaseInProgress = useCallback(() => {
+    setPurchaseInProgress(null)
   }, [])
 
   // Efecto para cargar datos iniciales
   useEffect(() => {
-    if (Object.keys(filters).length > 0) {
+    if (Object.keys(initialFilters).length > 0) {
       fetchPurchases({ silent: true })
     }
-  }, [filters, fetchPurchases])
+  }, [])
 
   return {
     // Estados
     loading,
     error,
-    filters,
     purchases,
     selectedPurchase,
     purchaseStats,
     todaySummary,
     pagination,
+    filters,
     purchaseInProgress,
     validationErrors,
 
@@ -654,32 +522,28 @@ export const usePurchases = (initialFilters = {}) => {
     getPurchaseById,
     createPurchase,
     receivePurchaseItems,
-    updatePurchaseStatus,
+    // updatePurchaseStatus, // REMOVED
     cancelPurchase,
     fetchPurchaseStats,
     fetchTodaySummary,
-    fetchPaymentStats, // NUEVA
-    preparePurchaseDataFromForm,
-
-    // Validaciones
-    validatePurchaseData,
-    validatePaymentsBeforeConfirm, // NUEVA
 
     // Utilidades
-    calculatePurchaseTotals,
-    calculatePaymentsTotal, // NUEVA
-    getPaymentTypes,
+    validatePurchaseData,
+    preparePurchaseDataFromForm,
     updateFilters,
     clearFilters,
-    getLocalStats,
-    formatCurrency,
-    formatDate,
-
-    // Manejo de compra en progreso
+    clearErrors,
+    clearSelectedPurchase,
+    retryPurchaseInProgress,
     clearPurchaseInProgress,
 
-    // Aliases para compatibilidad
-    refetch: fetchPurchases,
+    // Funciones de formateo (re-exportadas del servicio)
+    formatCurrency: purchasesService.formatCurrency,
+    formatDate: purchasesService.formatDate,
+    getTipoPago: purchasesService.getTipoPago,
+    getEstadoCompra: purchasesService.getEstadoCompra,
+    getPaymentTypes: purchasesService.getPaymentTypes,
+    calculatePurchaseTotals: purchasesService.calculatePurchaseTotals,
   }
 }
 

@@ -1,7 +1,7 @@
 import { apiClient } from "../config/api"
 
 export const suppliersService = {
-  // Obtener todos los proveedores
+  // Obtener todos los proveedores con filtros y paginación
   getSuppliers: async (filters = {}) => {
     try {
       const params = new URLSearchParams()
@@ -13,12 +13,14 @@ export const suppliersService = {
       })
 
       const response = await apiClient.get(`/suppliers?${params.toString()}`)
-      return { success: true, data: response.data }
+      return { success: true, data: response.data.data, pagination: response.data.pagination }
     } catch (error) {
       return {
         success: false,
         message: error.response?.data?.message || "Error al obtener proveedores",
         error: error.response?.data,
+        data: [],
+        pagination: null,
       }
     }
   },

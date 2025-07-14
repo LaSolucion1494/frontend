@@ -130,7 +130,6 @@ const CategoryModal = ({ isOpen, onClose, onSave, category = null, isEditing = f
                   type="text"
                   value={formData.nombre}
                   onChange={(e) => handleInputChange("nombre", e.target.value)}
-                  placeholder="Ej: Repuestos de Motor"
                   className={`bg-slate-100 ${errors.nombre ? "border-red-500 focus:border-red-500" : "border-slate-800"}`}
                   disabled={loading}
                   maxLength={50}
@@ -153,7 +152,6 @@ const CategoryModal = ({ isOpen, onClose, onSave, category = null, isEditing = f
                   id="descripcion"
                   value={formData.descripcion}
                   onChange={(e) => handleInputChange("descripcion", e.target.value)}
-                  placeholder="Describe brevemente esta categoría (opcional)"
                   className={`h-24 resize-none bg-slate-100 ${errors.descripcion ? "border-red-500 focus:border-red-500" : "border-slate-800"}`}
                   disabled={loading}
                   maxLength={200}

@@ -1,96 +1,128 @@
 import { apiClient } from "../config/api"
 
 export const cashClosingService = {
-  // Obtener resumen diario de ventas
-  async getDailySummary(fecha = null) {
+  // Obtener datos para el cierre de caja pendiente
+  async getPendingCashClosingData(startDate, startTime, endDate, endTime, tipoCierre) {
     try {
-      const params = new URLSearchParams()
-      if (fecha) {
-        params.append("fecha", fecha)
-      }
-
-      const response = await apiClient.get(`/cash-closing/daily-summary?${params.toString()}`)
-      return { success: true, data: response.data }
+      const response = await apiClient.get("/cash-closing/pending", {
+        params: {
+          fechaInicio: startDate,
+          horaInicio: startTime,
+          fechaFin: endDate,
+          horaFin: endTime,
+          tipoCierre: tipoCierre,
+        },
+      })
+      return { success: true, data: response.data.data, message: response.data.message }
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || "Error al obtener resumen diario",
+        message: error.response?.data?.message || "Error al obtener datos para cierre de caja",
         error: error.response?.data,
       }
     }
   },
 
-  // Crear un nuevo cierre de caja
-  async createClosing(closingData) {
+  // Realizar un cierre de caja
+  async createCashClosing(closingData) {
     try {
       const response = await apiClient.post("/cash-closing", closingData)
-      return { success: true, data: response.data }
+      return { success: true, data: response.data.data, message: response.data.message }
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || "Error al crear cierre de caja",
+        message: error.response?.data?.message || "Error al realizar cierre de caja",
         error: error.response?.data,
       }
     }
   },
 
-  // Obtener todos los cierres con filtros
-  async getClosings(filters = {}) {
+  // Obtener historial de cierres de caja
+  async getCashClosings(filters = {}) {
     try {
       const params = new URLSearchParams()
-
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== "") {
           params.append(key, value)
         }
       })
-
       const response = await apiClient.get(`/cash-closing?${params.toString()}`)
-      return { success: true, data: response.data }
+      return { success: true, data: response.data.data }
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || "Error al obtener cierres de caja",
+        message: error.response?.data?.message || "Error al obtener historial de cierres de caja",
         error: error.response?.data,
-        data: [],
       }
     }
   },
 
-  // Obtener un cierre por ID
-  async getClosingById(id) {
+  // Obtener detalles de un cierre de caja por ID
+  async getCashClosingById(id) {
     try {
       const response = await apiClient.get(`/cash-closing/${id}`)
-      return { success: true, data: response.data }
+      return { success: true, data: response.data.data }
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || "Error al obtener cierre de caja",
+        message: error.response?.data?.message || "Error al obtener detalles del cierre de caja",
         error: error.response?.data,
       }
     }
   },
 
-  // Obtener estadísticas
-  async getStats(filters = {}) {
-    try {
-      const params = new URLSearchParams()
+  // Funciones de utilidad
+  formatCurrency(amount) {
+    return new Intl.NumberFormat("es-AR", {
+      style: "currency",
+      currency: "ARS",
+    }).format(amount || 0)
+  },
 
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== "") {
-          params.append(key, value)
-        }
-      })
+  formatDate(dateString) {
+    if (!dateString) return ""
+    const date = new Date(dateString)
+    return date.toLocaleDateString("es-AR")
+  },
 
-      const response = await apiClient.get(`/cash-closing/stats?${params.toString()}`)
-      return { success: true, data: response.data }
-    } catch (error) {
-      return {
-        success: false,
-        message: error.response?.data?.message || "Error al obtener estadísticas",
-        error: error.response?.data,
-        data: null,
-      }
+  formatDateTime(isoString) {
+    if (!isoString) return { date: "", time: "" }
+    const date = new Date(isoString)
+    return {
+      date: date.toLocaleDateString("es-AR"),
+      time: date.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
     }
+  },
+
+  getPaymentMethodLabel(method) {
+    const labels = {
+      efectivo: "Efectivo",
+      tarjeta: "Tarjeta",
+      transferencia: "Transferencia",
+      cuenta_corriente: "Cuenta Corriente",
+      otro: "Otro",
+      tarjeta_credito: "Tarjeta Crédito",
+      tarjeta_debito: "Tarjeta Débito",
+    }
+    return labels[method] || method
+  },
+
+  getMovementTypeLabel(type) {
+    const labels = {
+      venta: "Venta",
+      compra: "Compra",
+      pago_cliente: "Pago Cliente",
+      ajuste_ingreso: "Ajuste Ingreso",
+      ajuste_egreso: "Ajuste Egreso",
+    }
+    return labels[type] || type
+  },
+
+  getClosingTypeLabel(type) {
+    const labels = {
+      ventas_only: "Solo Ventas",
+      full: "Ventas y Compras",
+    }
+    return labels[type] || type
   },
 }

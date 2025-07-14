@@ -1,16 +1,18 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Search, Package, Plus, Barcode, Tag, TrendingUp, X, AlertTriangle } from "lucide-react"
 import { useDebounce } from "../../hooks/useDebounce"
+import PurchaseQuantityModal from "./PurchaseQuantityModal"
 
 const PurchaseProductSelectionModal = ({ isOpen, onClose, onProductSelect, products = [], loading = false }) => {
   const [searchTerm, setSearchTerm] = useState("")
   const [filteredProducts, setFilteredProducts] = useState([])
+  const [showQuantityModal, setShowQuantityModal] = useState(false)
+  const [selectedProductForQuantity, setSelectedProductForQuantity] = useState(null)
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
@@ -65,7 +67,26 @@ const PurchaseProductSelectionModal = ({ isOpen, onClose, onProductSelect, produ
 
   // Manejar selección de producto
   const handleSelectProduct = (product) => {
-    onProductSelect(product)
+    setSelectedProductForQuantity(product)
+    setShowQuantityModal(true)
+  }
+
+  const handleQuantityConfirm = (product, quantity) => {
+    onProductSelect(product, quantity)
+    setShowQuantityModal(false)
+    setSelectedProductForQuantity(null)
+    onClose()
+  }
+
+  const handleQuantityModalClose = () => {
+    setShowQuantityModal(false)
+    setSelectedProductForQuantity(null)
+  }
+
+  // Limpiar estado al cerrar
+  const handleClose = () => {
+    setSearchTerm("")
+    setFilteredProducts([])
     onClose()
   }
 
@@ -81,6 +102,9 @@ const PurchaseProductSelectionModal = ({ isOpen, onClose, onProductSelect, produ
 
   // Obtener estado del stock para compras (enfoque en reposición)
   const getStockStatus = (product) => {
+    // CORREGIDO: Usar stock_minimo_config si está disponible, sino usar stock_minimo
+    const stockMinimo = product.stock_minimo_config || product.stock_minimo || 5
+
     if (product.stock <= 0) {
       return {
         status: "sin-stock",
@@ -88,7 +112,7 @@ const PurchaseProductSelectionModal = ({ isOpen, onClose, onProductSelect, produ
         text: "Sin stock",
         icon: AlertTriangle,
       }
-    } else if (product.stock <= product.stock_minimo) {
+    } else if (product.stock <= stockMinimo) {
       return {
         status: "stock-bajo",
         color: "bg-orange-100 text-orange-800 border-orange-200",
@@ -105,34 +129,35 @@ const PurchaseProductSelectionModal = ({ isOpen, onClose, onProductSelect, produ
     }
   }
 
+  if (!isOpen) return null
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden bg-white flex flex-col p-0">
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[100] p-4">
+      <div className="bg-white shadow-xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden relative z-[101]">
         {/* Header */}
-        <div className="flex-shrink-0 p-6 border-b border-slate-200 bg-slate-800">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-slate-600 rounded-lg flex items-center justify-center">
-                <Package className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <DialogTitle className="text-xl font-bold text-white">Seleccionar Productos</DialogTitle>
-                <p className="text-sm text-slate-300 mt-1">Agregue productos al carrito de compras</p>
-              </div>
+        <div className="flex-shrink-0 flex items-center justify-between p-4 bg-slate-800">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-slate-600 rounded-lg flex items-center justify-center">
+              <Package className="w-4 h-4 text-white" />
             </div>
-            <Button
-              onClick={onClose}
-              variant="ghost"
-              size="sm"
-              className="text-slate-300 hover:text-white hover:bg-slate-700"
-            >
-              <X className="w-5 h-5" />
-            </Button>
+            <div>
+              <h2 className="text-xl font-semibold text-white">Seleccionar Productos</h2>
+              <p className="text-sm text-slate-300 mt-1">Agregue productos al carrito de compras</p>
+            </div>
           </div>
+          <Button
+            onClick={handleClose}
+            variant="ghost"
+            size="sm"
+            className="text-slate-300 hover:text-white hover:bg-slate-700"
+            disabled={loading}
+          >
+            <X className="w-5 h-5" />
+          </Button>
         </div>
 
-        {/* Contenido */}
-        <div className="flex-1 overflow-y-auto p-6">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6" style={{ maxHeight: "calc(90vh - 120px)" }}>
           <div className="space-y-6">
             {/* Búsqueda */}
             <div className="relative">
@@ -142,8 +167,9 @@ const PurchaseProductSelectionModal = ({ isOpen, onClose, onProductSelect, produ
                 placeholder="Buscar por nombre, código o marca..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 border-slate-300 bg-white focus:border-slate-800 focus:ring-slate-800/20"
+                className="pl-10 border-slate-300 bg-slate-50 focus:border-slate-800 focus:ring-slate-800/20"
                 disabled={loading}
+                autoFocus
               />
             </div>
 
@@ -160,6 +186,8 @@ const PurchaseProductSelectionModal = ({ isOpen, onClose, onProductSelect, produ
                     const stockStatus = getStockStatus(product)
                     const precioCosto = product.precio_costo || product.precioCosto || 0
                     const StatusIcon = stockStatus.icon
+                    // CORREGIDO: Usar stock_minimo_config si está disponible
+                    const stockMinimo = product.stock_minimo_config || product.stock_minimo || 5
 
                     return (
                       <div key={product.id} className="p-5 hover:bg-slate-50 transition-colors">
@@ -197,6 +225,7 @@ const PurchaseProductSelectionModal = ({ isOpen, onClose, onProductSelect, produ
                                 onClick={() => handleSelectProduct(product)}
                                 className="ml-4 bg-slate-800 hover:bg-slate-700 text-white"
                                 size="sm"
+                                disabled={loading}
                               >
                                 <Plus className="h-3 w-3 mr-1" />
                                 Agregar
@@ -212,11 +241,10 @@ const PurchaseProductSelectionModal = ({ isOpen, onClose, onProductSelect, produ
                                 </Badge>
                                 <span className="text-sm text-slate-600">
                                   Stock: <span className="font-medium">{product.stock}</span>
-                                  {product.stock_minimo && (
-                                    <span className="text-slate-400"> (mín: {product.stock_minimo})</span>
-                                  )}
+                                  {/* CORREGIDO: Mostrar el stock mínimo configurado por el usuario */}
+                                  <span className="text-slate-400"> (mín: {stockMinimo})</span>
                                 </span>
-                                {product.stock <= product.stock_minimo && (
+                                {product.stock <= stockMinimo && (
                                   <div className="flex items-center text-orange-600">
                                     <TrendingUp className="h-3 w-3" />
                                     <span className="text-xs ml-1">Necesita reposición</span>
@@ -271,8 +299,16 @@ const PurchaseProductSelectionModal = ({ isOpen, onClose, onProductSelect, produ
             </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+        {/* Modal de cantidad */}
+        <PurchaseQuantityModal
+          isOpen={showQuantityModal}
+          onClose={handleQuantityModalClose}
+          onConfirm={handleQuantityConfirm}
+          product={selectedProductForQuantity}
+          loading={loading}
+        />
+      </div>
+    </div>
   )
 }
 

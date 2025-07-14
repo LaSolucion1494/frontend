@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "../ui/button"
 import { Badge } from "../ui/badge"
 import { Separator } from "../ui/separator"
-import { Trash2, Plus, Minus, Edit3, Package, Tag, Barcode } from "lucide-react"
+import { Trash2, Plus, Minus, Edit3, Package, Tag, Barcode, Check, X, AlertTriangle } from "lucide-react"
 import { NumericFormat } from "react-number-format"
 
 const PurchaseProductCard = ({ product, onUpdateQuantity, onRemove, onUpdatePrice, formatCurrency }) => {
@@ -20,13 +20,20 @@ const PurchaseProductCard = ({ product, onUpdateQuantity, onRemove, onUpdatePric
   }
 
   const handlePriceSave = () => {
-    onUpdatePrice(product.id, { precio_costo: tempPrice })
+    // Solo actualizar en el carrito, no en la base de datos
+    onUpdatePrice(product.id, {
+      precio_costo: tempPrice,
+    })
     setEditingPrice(false)
   }
 
   const handlePriceCancel = () => {
     setTempPrice(product.precio_costo)
     setEditingPrice(false)
+  }
+
+  const handlePriceChange = (value) => {
+    setTempPrice(value)
   }
 
   const handleKeyPress = (e) => {
@@ -37,19 +44,11 @@ const PurchaseProductCard = ({ product, onUpdateQuantity, onRemove, onUpdatePric
     }
   }
 
-  // Calcular precio sugerido de venta (con margen del 40%)
-  const calculateSuggestedPrice = (costPrice, margin = 40) => {
-    return costPrice * (1 + margin / 100)
-  }
+  // Verificar si el precio ha sido modificado
+  const priceModified = product.precio_costo !== (product.precio_costo_original || product.precio_costo)
 
-  // Calcular margen actual si existe precio de venta
-  const calculateCurrentMargin = (costPrice, salePrice) => {
-    if (costPrice === 0) return 0
-    return ((salePrice - costPrice) / costPrice) * 100
-  }
-
-  const suggestedPrice = calculateSuggestedPrice(product.precio_costo)
-  const currentMargin = product.precio_venta ? calculateCurrentMargin(product.precio_costo, product.precio_venta) : 0
+  // Stock mínimo configurado
+  const stockMinimo = product.stock_minimo_config || product.stock_minimo || 5
 
   return (
     <div className="bg-white border border-slate-200 rounded-lg hover:shadow-md transition-all duration-200 shadow-sm">
@@ -74,7 +73,7 @@ const PurchaseProductCard = ({ product, onUpdateQuantity, onRemove, onUpdatePric
                         <>
                           <span>•</span>
                           <div className="flex items-center">
-                            <Tag className="w-3 h-3 mr-1" />
+                            <Tag className="w-3 w-3 mr-1" />
                             <span>{product.marca}</span>
                           </div>
                         </>
@@ -90,9 +89,7 @@ const PurchaseProductCard = ({ product, onUpdateQuantity, onRemove, onUpdatePric
                       <span>
                         Stock actual: <span className="font-medium">{product.stock}</span>
                       </span>
-                      {product.stock_minimo && (
-                        <span className="ml-2 text-slate-400">(mín: {product.stock_minimo})</span>
-                      )}
+                      <span className="ml-2 text-slate-400">(mín {stockMinimo})</span>
                     </div>
                   </div>
                 </div>
@@ -130,25 +127,33 @@ const PurchaseProductCard = ({ product, onUpdateQuantity, onRemove, onUpdatePric
               </div>
             </div>
 
-            {/* Información de precios */}
+            {/* Información de precio simplificada */}
             <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
               <div className="space-y-4">
                 {/* Precio de costo editable */}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-700">Precio de costo:</span>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-medium text-slate-700">Precio de costo:</span>
+                    {priceModified && (
+                      <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-300">
+                        <AlertTriangle className="w-3 h-3 mr-1" />
+                        Modificado
+                      </Badge>
+                    )}
+                  </div>
                   <div className="flex items-center space-x-2">
                     {editingPrice ? (
                       <div className="flex items-center space-x-2">
                         <NumericFormat
                           value={tempPrice}
-                          onValueChange={(values) => setTempPrice(Number.parseFloat(values.value) || 0)}
+                          onValueChange={(values) => handlePriceChange(Number.parseFloat(values.value) || 0)}
                           onKeyDown={handleKeyPress}
                           thousandSeparator="."
                           decimalSeparator=","
                           decimalScale={2}
                           fixedDecimalScale={true}
                           allowNegative={false}
-                          className="w-28 h-8 text-sm text-right border border-slate-300 rounded-md px-2 focus:border-slate-800 focus:ring-1 focus:ring-slate-800/20"
+                          className="w-32 h-8 text-sm text-right border border-slate-300 rounded-md px-2 focus:border-slate-800 focus:ring-1 focus:ring-slate-800/20"
                           autoFocus
                         />
                         <Button
@@ -157,7 +162,7 @@ const PurchaseProductCard = ({ product, onUpdateQuantity, onRemove, onUpdatePric
                           className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
                           onClick={handlePriceSave}
                         >
-                          ✓
+                          <Check className="h-3 w-3" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -165,7 +170,7 @@ const PurchaseProductCard = ({ product, onUpdateQuantity, onRemove, onUpdatePric
                           className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                           onClick={handlePriceCancel}
                         >
-                          ✕
+                          <X className="h-3 w-3" />
                         </Button>
                       </div>
                     ) : (
@@ -180,23 +185,6 @@ const PurchaseProductCard = ({ product, onUpdateQuantity, onRemove, onUpdatePric
                   </div>
                 </div>
 
-                {/* Precio sugerido de venta */}
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-600">Precio sugerido (+40%):</span>
-                  <span className="font-medium text-green-600">{formatCurrency(suggestedPrice)}</span>
-                </div>
-
-                {/* Precio actual de venta si existe */}
-                {product.precio_venta && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-600">Precio actual de venta:</span>
-                    <div className="text-right">
-                      <span className="font-medium text-slate-900">{formatCurrency(product.precio_venta)}</span>
-                      <div className="text-xs text-blue-600">Margen: {currentMargin.toFixed(1)}%</div>
-                    </div>
-                  </div>
-                )}
-
                 <Separator className="bg-slate-200" />
 
                 {/* Total por cantidad */}
@@ -208,6 +196,16 @@ const PurchaseProductCard = ({ product, onUpdateQuantity, onRemove, onUpdatePric
                     {formatCurrency(product.quantity * product.precio_costo)}
                   </span>
                 </div>
+
+                {/* Información sobre actualización de precios */}
+                {priceModified && (
+                  <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
+                    <div className="flex items-center">
+                      <AlertTriangle className="w-3 h-3 mr-1" />
+                      <span>El precio se actualizará en el stock al confirmar la compra</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

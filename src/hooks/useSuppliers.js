@@ -4,41 +4,74 @@ import { useState, useEffect, useCallback } from "react"
 import { suppliersService } from "../services/suppliersService"
 import toast from "react-hot-toast"
 
-export const useSuppliers = () => {
+export const useSuppliers = (initialFilters = {}) => {
   const [suppliers, setSuppliers] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [filters, setFilters] = useState({
+    search: "",
+    limit: 10,
+    offset: 0,
+    ...initialFilters,
+  })
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10,
+  })
 
-  const fetchSuppliers = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  const fetchSuppliers = useCallback(
+    async (customFilters = {}) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const finalFilters = { ...filters, ...customFilters }
+        const result = await suppliersService.getSuppliers(finalFilters)
 
-    try {
-      const result = await suppliersService.getSuppliers()
-
-      if (result.success) {
-        setSuppliers(result.data)
-      } else {
-        setError(result.message)
-        toast.error(result.message)
+        if (result.success) {
+          setSuppliers(result.data)
+          if (result.pagination) {
+            setPagination(result.pagination)
+          }
+        } else {
+          setError(result.message)
+          toast.error(result.message)
+        }
+      } catch (error) {
+        const message = "Error al cargar proveedores"
+        setError(message)
+        toast.error(message)
+      } finally {
+        setLoading(false)
       }
-    } catch (error) {
-      const message = "Error al cargar proveedores"
-      setError(message)
-      toast.error(message)
-    } finally {
-      setLoading(false)
-    }
+    },
+    [filters],
+  )
+
+  const updateFilters = useCallback((newFilters) => {
+    setFilters((prev) => ({ ...prev, ...newFilters }))
   }, [])
+
+  const handlePageChange = useCallback(
+    (page) => {
+      const newOffset = (page - 1) * filters.limit
+      updateFilters({ offset: newOffset })
+    },
+    [filters.limit, updateFilters],
+  )
+
+  useEffect(() => {
+    fetchSuppliers()
+  }, [filters, fetchSuppliers])
 
   const createSupplier = async (supplierData) => {
     setLoading(true)
     try {
       const result = await suppliersService.createSupplier(supplierData)
-
       if (result.success) {
         toast.success("Proveedor creado exitosamente")
-        await fetchSuppliers()
+        await fetchSuppliers({ offset: 0 }) // Volver a la primera página
         return { success: true }
       } else {
         toast.error(result.message)
@@ -57,7 +90,6 @@ export const useSuppliers = () => {
     setLoading(true)
     try {
       const result = await suppliersService.updateSupplier(id, supplierData)
-
       if (result.success) {
         toast.success("Proveedor actualizado exitosamente")
         await fetchSuppliers()
@@ -79,10 +111,9 @@ export const useSuppliers = () => {
     setLoading(true)
     try {
       const result = await suppliersService.deleteSupplier(id)
-
       if (result.success) {
         toast.success("Proveedor eliminado exitosamente")
-        await fetchSuppliers()
+        await fetchSuppliers({ offset: 0 }) // Volver a la primera página
         return { success: true }
       } else {
         toast.error(result.message)
@@ -97,18 +128,17 @@ export const useSuppliers = () => {
     }
   }
 
-  useEffect(() => {
-    fetchSuppliers()
-  }, [fetchSuppliers])
-
   return {
     suppliers,
     loading,
     error,
+    pagination,
     fetchSuppliers,
     createSupplier,
     updateSupplier,
     deleteSupplier,
+    updateFilters,
+    handlePageChange,
     refetch: fetchSuppliers,
   }
 }

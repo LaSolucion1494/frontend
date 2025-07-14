@@ -84,6 +84,7 @@ const Ventas = () => {
   }, [cartProducts, formData.interestDiscount, formData.interestDiscountType, formData.isInterest])
 
   const calculateTotals = () => {
+    // Cálculo simplificado - solo suma los precios finales de los productos
     const subtotal = cartProducts.reduce((sum, product) => sum + product.quantity * product.precio_venta, 0)
 
     let adjustment = 0
@@ -103,22 +104,21 @@ const Ventas = () => {
     setFormData((prev) => ({ ...prev, subtotal, total }))
   }
 
-  const addProductToCart = (product) => {
+  // Función simplificada para agregar producto al carrito
+  const addProductToCart = (product, quantity = 1) => {
     const existingProduct = cartProducts.find((p) => p.id === product.id)
     if (existingProduct) {
-      updateProductQuantity(product.id, existingProduct.quantity + 1)
+      updateProductQuantity(product.id, existingProduct.quantity + quantity)
     } else {
-      const productWithConfig = {
+      const productWithDefaults = {
         ...product,
-        quantity: 1,
-        iva_porcentaje: config?.iva || 21,
-        ingresos_brutos_porcentaje: config?.ingresos_brutos || 0,
+        quantity: quantity,
         discount_active: false,
         discount_percentage: 0,
       }
-      setCartProducts((prev) => [...prev, productWithConfig])
+      setCartProducts((prev) => [...prev, productWithDefaults])
     }
-    toast.success(`${product.nombre} agregado al carrito`)
+    toast.success(`${product.nombre} agregado al carrito (${quantity} unidades)`)
   }
 
   const updateProductQuantity = (productId, newQuantity) => {
@@ -138,7 +138,6 @@ const Ventas = () => {
           return {
             ...product,
             ...newPriceData,
-            // Asegurar que estos campos siempre estén presentes
             discount_active:
               newPriceData.discount_active !== undefined
                 ? newPriceData.discount_active
@@ -182,7 +181,6 @@ const Ventas = () => {
     })
   }
 
-  // CORREGIDO: Manejo mejorado del proceso de pago y facturación
   const handlePaymentConfirm = async (payments) => {
     if (cartProducts.length === 0) {
       toast.error("Debe agregar al menos un producto")
@@ -203,17 +201,14 @@ const Ventas = () => {
       if (result.success) {
         setShowPaymentModal(false)
 
-        // CORREGIDO: Obtener el ID de venta de manera más robusta
         const saleId = result.data?.data?.id || result.data?.id
 
         if (saleId) {
-          // CORREGIDO: Esperar un momento antes de obtener los detalles
           setTimeout(async () => {
             try {
               const saleDetails = await getSaleById(saleId)
 
               if (saleDetails.success) {
-              
                 setCompletedSale({
                   ...saleDetails.data,
                   tipoFactura: formData.tipoFactura,
@@ -227,7 +222,7 @@ const Ventas = () => {
               console.error("Error al obtener detalles de venta:", error)
               toast.error("Venta creada pero no se pudo generar la factura")
             }
-          }, 500) // Esperar 500ms para que la venta se guarde completamente
+          }, 500)
         } else {
           console.error("No se pudo obtener el ID de venta")
           toast.error("Venta creada pero no se pudo generar la factura")
@@ -307,7 +302,7 @@ const Ventas = () => {
 
   return (
     <Layout>
-      <div className="max-w-[88rem] mx-auto px-4 py-6 min-h-screen">
+      <div className="max-w-[95rem] mx-auto px-4 py-6 min-h-screen">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Columna Principal */}
           <div className="lg:col-span-2 space-y-6">
@@ -334,7 +329,7 @@ const Ventas = () => {
               </CardHeader>
               <CardContent className="pt-0">
                 {clienteSeleccionado ? (
-                  <div className="bg-gray-200 rounded-lg p-4 -mt-3 ">
+                  <div className="bg-gray-200 rounded-lg p-4 -mt-3">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <h3 className="font-semibold text-gray-900 text-lg">{clienteSeleccionado.nombre}</h3>
@@ -442,7 +437,6 @@ const Ventas = () => {
 
           {/* Sidebar - Cálculos y Acciones */}
           <div className="space-y-6">
-            {/* Cálculos */}
             <div className="sticky top-32 z-10">
               <Card className="border-0 shadow-lg">
                 <CardHeader className="pb-4 bg-slate-800">
@@ -499,10 +493,10 @@ const Ventas = () => {
                     <span className="font-semibold text-gray-900 text-lg">{formatCurrency(formData.subtotal)}</span>
                   </div>
 
-                  {/* Ajustes */}
+                  {/* Ajustes adicionales (descuento/interés general) */}
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Ajustes</span>
+                      <span className="text-sm font-medium text-gray-700">Ajustes Adicionales</span>
                       <div className="flex rounded-lg border border-gray-200 p-1">
                         <button
                           onClick={() => setFormData((prev) => ({ ...prev, isInterest: false }))}
@@ -604,7 +598,7 @@ const Ventas = () => {
                     <Button
                       onClick={clearCart}
                       variant="outline"
-                      className="border-gray-200 text-gray-700 hover:bg-gray-50"
+                      className="border-gray-200 text-gray-700 hover:bg-gray-50 bg-transparent"
                     >
                       <RefreshCw className="w-4 h-4 mr-1" />
                       Limpiar Todo

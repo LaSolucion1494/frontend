@@ -1,326 +1,533 @@
 "use client"
 
-import { useAuth } from "../context/AuthContext"
-import {
-  Car,
-  Package,
-  BarChart3,
-  Users,
-  Settings,
-  ShoppingCart,
-  TrendingUp,
-  AlertTriangle,
-  UserCheck,
-  Shield,
-  CreditCard,
-} from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card"
+import { useState, useEffect, useRef } from "react"
+import { useNavigate } from "react-router-dom"
 import Layout from "../components/Layout"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card"
+import { Button } from "../components/ui/button"
+import { Input } from "../components/ui/input"
+import { Badge } from "../components/ui/badge"
+import {
+  Search,
+  Package,
+  ShoppingCart,
+  Users,
+  AlertTriangle,
+  Plus,
+  RefreshCw,
+  ScanLine,
+  Clock,
+  CheckCircle2,
+  ArrowRight,
+  Barcode,
+  Store,
+  CreditCard,
+  FileText,
+  Activity,
+} from "lucide-react"
+import { formatCurrency, formatDate } from "../lib/utils"
+import { useDashboard } from "../hooks/useDashboard"
+import { useProducts } from "../hooks/useProducts"
+import { Loading } from "../components/ui/loading"
+import ProductQuickSearchModal from "../components/dashboard/ProductQuickSearchModal"
+import { useAuth } from "../context/AuthContext"
 
 const Dashboard = () => {
+  const navigate = useNavigate()
+
+  // Auth context
   const { user } = useAuth()
 
-  // Menús base para empleados
-  const getEmployeeMenuItems = () => [
-    { icon: ShoppingCart, label: "Ventas", color: "bg-green-500", description: "Registrar ventas", href: "/ventas" },
-    { icon: Package, label: "Compras", color: "bg-blue-500", description: "Gestionar compras", href: "/compras" },
-    {
-      icon: CreditCard,
-      label: "Cierre de caja",
-      color: "bg-purple-500",
-      description: "Cerrar caja diaria",
-      href: "/cierre-caja",
-    },
-  ]
+  const searchInputRef = useRef(null)
 
-  // Menús adicionales solo para administradores
-  const getAdminOnlyMenuItems = () => [
-    { icon: Package, label: "Inventario", color: "bg-blue-500", description: "Gestionar productos", href: "/stock" },
-    {
-      icon: Users,
-      label: "Clientes",
-      color: "bg-orange-500",
-      description: "Gestionar clientes",
-      href: "/ajustes/clientes",
-    },
-    { icon: Car, label: "Repuestos", color: "bg-red-500", description: "Catálogo de repuestos", href: "/stock" },
-    {
-      icon: BarChart3,
-      label: "Reportes",
-      color: "bg-purple-500",
-      description: "Análisis y reportes",
-      href: "/reportes/ventas",
-    },
-    {
-      icon: UserCheck,
-      label: "Usuarios",
-      color: "bg-indigo-500",
-      description: "Gestionar usuarios",
-      href: "/ajustes/usuarios",
-    },
-    {
-      icon: Settings,
-      label: "Configuración",
-      color: "bg-gray-500",
-      description: "Configuración del sistema",
-      href: "/ajustes/negocio",
-    },
-  ]
+  // Estados locales
+  const [quickSearchTerm, setQuickSearchTerm] = useState("")
+  const [isQuickSearchModalOpen, setIsQuickSearchModalOpen] = useState(false)
+  const [searchResults, setSearchResults] = useState([])
+  const [searchLoading, setSearchLoading] = useState(false)
 
-  // Obtener menús según el rol
-  const getMenuItems = () => {
-    const baseItems = getEmployeeMenuItems()
-    return user?.rol === "admin" ? [...baseItems, ...getAdminOnlyMenuItems()] : baseItems
+  // Hooks personalizados
+  const { stats, recentSales, lowStockProducts, loading: dashboardLoading, fetchDashboardData } = useDashboard()
+
+  const { getProductByCode, searchProducts } = useProducts()
+
+  // Cargar datos del dashboard al montar
+  useEffect(() => {
+    fetchDashboardData()
+  }, [fetchDashboardData])
+
+  // Función para búsqueda rápida de productos
+  const handleQuickSearch = async (searchTerm) => {
+    if (!searchTerm.trim()) {
+      setSearchResults([])
+      return
+    }
+
+    setSearchLoading(true)
+    try {
+      // Primero intentar búsqueda por código exacto
+      if (searchTerm.length > 3) {
+        const exactResult = await getProductByCode(searchTerm)
+        if (exactResult.success) {
+          setSearchResults([exactResult.data])
+          setSearchLoading(false)
+          return
+        }
+      }
+
+      // Si no encuentra por código, buscar por nombre/descripción
+      const searchResult = await searchProducts({
+        search: searchTerm,
+        limit: 10,
+      })
+
+      if (searchResult.success) {
+        setSearchResults(searchResult.data || [])
+      } else {
+        setSearchResults([])
+      }
+    } catch (error) {
+      console.error("Error en búsqueda rápida:", error)
+      setSearchResults([])
+    } finally {
+      setSearchLoading(false)
+    }
   }
 
-  const menuItems = getMenuItems()
+  // Debounce para la búsqueda
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      handleQuickSearch(quickSearchTerm)
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
+  }, [quickSearchTerm])
+
+  // Función para abrir el modal de búsqueda detallada
+  const openQuickSearchModal = () => {
+    setIsQuickSearchModalOpen(true)
+  }
+
+  // Función para manejar Enter en la búsqueda rápida
+  const handleSearchKeyDown = (e) => {
+    if (e.key === "Enter" && searchResults.length > 0) {
+      openQuickSearchModal()
+    }
+  }
+
+  // Función para obtener el color del estado de stock
+  const getStockStatusColor = (product) => {
+    const stockMinimo = product.stock_minimo || 5
+    if (product.stock === 0) return "text-red-600 bg-red-50 border-red-200"
+    if (product.stock <= stockMinimo) return "text-orange-600 bg-orange-50 border-orange-200"
+    return "text-green-600 bg-green-50 border-green-200"
+  }
+
+  // Función para obtener el texto del estado de stock
+  const getStockStatusText = (product) => {
+    const stockMinimo = product.stock_minimo || 5
+    if (product.stock === 0) return "Sin stock"
+    if (product.stock <= stockMinimo) return "Stock bajo"
+    return "Disponible"
+  }
+
+  if (dashboardLoading) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
+          <Loading text="Cargando dashboard..." size="lg" />
+        </div>
+      </Layout>
+    )
+  }
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-4xl font-bold text-slate-900 mb-2">¡Bienvenido, {user?.nombre}!</h2>
-          <p className="text-slate-600 text-lg">
-            {user?.rol === "admin"
-              ? "Panel de administración completo - Acceso total al sistema"
-              : "Panel de empleado - Gestiona las operaciones diarias"}
-          </p>
-          {user?.rol === "empleado" && (
-            <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
-              <UserCheck className="w-4 h-4" />
-              <span>Acceso limitado: Ventas, Compras y Cierre de caja</span>
+      <div className="min-h-screen bg-gray-50/50">
+        <div className="container mx-auto p-4 md:p-6 lg:p-8 max-w-[95rem]">
+          {/* Header */}
+          <div className="mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  Bienvenido {user?.nombre ? `${user.nombre}` : "al Dashboard"}
+                </h1>
+                <p className="text-muted-foreground mt-2">Sistema de gestión de repuestos</p>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={() => fetchDashboardData()} variant="outline" disabled={dashboardLoading}>
+                  <RefreshCw className={`w-4 h-4 mr-2 ${dashboardLoading ? "animate-spin" : ""}`} />
+                  Actualizar
+                </Button>
+                <Button onClick={() => navigate("/ventas")} className="bg-slate-800 hover:bg-slate-900">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nueva Venta
+                </Button>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white border border-slate-200 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="p-3 bg-green-100 rounded-xl border border-green-200">
-                  <ShoppingCart className="w-6 h-6 text-green-600" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-slate-600">Ventas del Día</p>
-                  <p className="text-2xl font-bold text-slate-900">$12,450</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border border-slate-200 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="p-3 bg-blue-100 rounded-xl border border-blue-200">
-                  <Package className="w-6 h-6 text-blue-600" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-slate-600">Compras del Mes</p>
-                  <p className="text-2xl font-bold text-slate-900">$8,750</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border border-slate-200 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="p-3 bg-purple-100 rounded-xl border border-purple-200">
-                  <CreditCard className="w-6 h-6 text-purple-600" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-slate-600">Caja Actual</p>
-                  <p className="text-2xl font-bold text-slate-900">$3,680</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {user?.rol === "admin" && (
-            <Card className="bg-white border border-slate-200 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <div className="p-3 bg-orange-100 rounded-xl border border-orange-200">
-                    <Users className="w-6 h-6 text-orange-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-slate-600">Clientes Activos</p>
-                    <p className="text-2xl font-bold text-slate-900">567</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {user?.rol === "empleado" && (
-            <Card className="bg-white border border-slate-200 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <div className="p-3 bg-yellow-100 rounded-xl border border-yellow-200">
-                    <TrendingUp className="w-6 h-6 text-yellow-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-slate-600">Mis Ventas Hoy</p>
-                    <p className="text-2xl font-bold text-slate-900">15</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Menu Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {menuItems.map((item, index) => (
-            <Card
-              key={index}
-              className="bg-white border border-slate-200 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group"
-              onClick={() => (window.location.href = item.href)}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <div
-                    className={`p-4 ${item.color}/10 rounded-xl border border-slate-200 group-hover:scale-110 transition-transform duration-300`}
-                  >
-                    <item.icon className={`w-8 h-8 ${item.color.replace("bg-", "text-")}`} />
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-xl font-bold text-slate-900 group-hover:text-slate-700 transition-colors duration-300">
-                      {item.label}
-                    </h3>
-                    <p className="text-sm text-slate-600">{item.description}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Recent Activity */}
-        <Card className="bg-white border border-slate-200 shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-slate-900 flex items-center">
-              <TrendingUp className="w-5 h-5 mr-2" />
-              Actividad Reciente
-            </CardTitle>
-            <CardDescription className="text-slate-600">
-              {user?.rol === "admin" ? "Últimas acciones en el sistema" : "Tus últimas actividades"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between py-3 border-b border-slate-200">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-green-400 rounded-full mr-3"></div>
-                  <span className="text-slate-900">Nueva venta registrada - Filtro de aceite</span>
-                </div>
-                <span className="text-xs text-slate-500">Hace 5 min</span>
-              </div>
-
-              <div className="flex items-center justify-between py-3 border-b border-slate-200">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-blue-400 rounded-full mr-3"></div>
-                  <span className="text-slate-900">Compra registrada - Pastillas de freno</span>
-                </div>
-                <span className="text-xs text-slate-500">Hace 15 min</span>
-              </div>
-
-              <div className="flex items-center justify-between py-3 border-b border-slate-200">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-purple-400 rounded-full mr-3"></div>
-                  <span className="text-slate-900">Cierre de caja realizado</span>
-                </div>
-                <span className="text-xs text-slate-500">Hace 1 hora</span>
-              </div>
-
-              {user?.rol === "admin" && (
-                <>
-                  <div className="flex items-center justify-between py-3 border-b border-slate-200">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-orange-400 rounded-full mr-3"></div>
-                      <span className="text-slate-900">Stock actualizado - Amortiguadores</span>
-                    </div>
-                    <span className="text-xs text-slate-500">Hace 2 horas</span>
-                  </div>
-
-                  <div className="flex items-center justify-between py-3">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-yellow-400 rounded-full mr-3"></div>
-                      <span className="text-slate-900">Nuevo usuario empleado creado</span>
-                    </div>
-                    <span className="text-xs text-slate-500">Hace 3 horas</span>
-                  </div>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Admin Only Section */}
-        {user?.rol === "admin" && (
-          <Card className="mt-8 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-slate-900 flex items-center">
-                <Shield className="w-5 h-5 mr-2 text-yellow-600" />
-                Panel de Administrador
+          {/* Buscador Rápido de Productos */}
+          <Card className="mb-8 border-2 border-slate-800 shadow-lg">
+            <CardHeader className="bg-slate-800 text-white">
+              <CardTitle className="flex items-center gap-2 mb-3">
+                <Search className="w-5 h-5" />
+                Búsqueda Rápida de Productos
               </CardTitle>
-              <CardDescription className="text-yellow-700">Funciones exclusivas para administradores</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="space-y-4 -mt-5">
+                <div className="relative">
+                  <ScanLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+                  <Input
+                    ref={searchInputRef}
+                    placeholder="Escanea código de barras o escribe nombre del producto..."
+                    value={quickSearchTerm}
+                    onChange={(e) => setQuickSearchTerm(e.target.value)}
+                    onKeyDown={handleSearchKeyDown}
+                    className="pl-12 pr-12 h-12 text-lg border-slate-300 focus:border-slate-800"
+                    autoComplete="off"
+                  />
+                  {searchLoading && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <RefreshCw className="w-5 h-5 animate-spin text-slate-600" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Resultados de búsqueda rápida */}
+                {searchResults.length > 0 && (
+                  <div className="border rounded-lg bg-white shadow-sm max-h-96 overflow-y-auto">
+                    <div className="p-3 bg-slate-50 border-b">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-700">
+                          {searchResults.length} resultado{searchResults.length !== 1 ? "s" : ""} encontrado
+                          {searchResults.length !== 1 ? "s" : ""}
+                        </span>
+                        <Button
+                          onClick={openQuickSearchModal}
+                          size="sm"
+                          variant="outline"
+                          className="text-xs bg-transparent"
+                        >
+                          Ver detalles
+                          <ArrowRight className="w-3 h-3 ml-1" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="divide-y">
+                      {searchResults.slice(0, 5).map((product) => (
+                        <div key={product.id} className="p-4 hover:bg-slate-50 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                  <Barcode className="w-4 h-4 text-slate-500" />
+                                  <span className="font-mono text-sm font-medium">{product.codigo}</span>
+                                </div>
+                                <Badge variant="outline" className={getStockStatusColor(product)}>
+                                  {getStockStatusText(product)}
+                                </Badge>
+                              </div>
+                              <h4 className="font-semibold text-slate-900 mt-1">{product.nombre}</h4>
+                              <div className="flex items-center gap-4 mt-2 text-sm text-slate-600">
+                                <span>
+                                  Stock: <strong>{product.stock}</strong>
+                                </span>
+                                <span>Marca: {product.marca || "Sin marca"}</span>
+                                <span>Categoría: {product.categoria_nombre}</span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-lg font-bold text-green-600">
+                                {formatCurrency(product.precio_venta)}
+                              </div>
+                              <div className="text-sm text-slate-500">
+                                Costo: {formatCurrency(product.precio_costo)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {searchResults.length > 5 && (
+                      <div className="p-3 bg-slate-50 border-t text-center">
+                        <Button onClick={openQuickSearchModal} size="sm" variant="outline">
+                          Ver todos los {searchResults.length} resultados
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {quickSearchTerm && searchResults.length === 0 && !searchLoading && (
+                  <div className="text-center py-8 text-slate-500">
+                    <Package className="w-12 h-12 mx-auto mb-3 text-slate-400" />
+                    <p className="font-medium">No se encontraron productos</p>
+                    <p className="text-sm">Intenta con otro código o nombre</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Estadísticas principales */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {/* Ventas del día */}
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-blue-700">Ventas Hoy</p>
+                    <p className="text-3xl font-bold text-blue-900">{stats?.ventasHoy || 0}</p>
+                    <p className="text-sm text-blue-600 mt-1">{formatCurrency(stats?.montoVentasHoy || 0)}</p>
+                  </div>
+                  <div className="p-3 bg-blue-500 rounded-full">
+                    <ShoppingCart className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Total productos */}
+            <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-green-700">Total Productos</p>
+                    <p className="text-3xl font-bold text-green-900">{stats?.totalProductos || 0}</p>
+                    <p className="text-sm text-green-600 mt-1">En inventario</p>
+                  </div>
+                  <div className="p-3 bg-green-500 rounded-full">
+                    <Package className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Stock bajo */}
+            <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-orange-700">Stock Bajo</p>
+                    <p className="text-3xl font-bold text-orange-900">{stats?.productosStockBajo || 0}</p>
+                    <p className="text-sm text-orange-600 mt-1">Requieren atención</p>
+                  </div>
+                  <div className="p-3 bg-orange-500 rounded-full">
+                    <AlertTriangle className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Clientes activos */}
+            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-purple-700">Clientes Activos</p>
+                    <p className="text-3xl font-bold text-purple-900">{stats?.clientesActivos || 0}</p>
+                    <p className="text-sm text-purple-600 mt-1">En el sistema</p>
+                  </div>
+                  <div className="p-3 bg-purple-500 rounded-full">
+                    <Users className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Accesos rápidos */}
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="w-5 h-5" />
+                Accesos Rápidos
+              </CardTitle>
+              <CardDescription>Accede rápidamente a las funciones más utilizadas</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-white rounded-lg border border-yellow-200">
-                  <AlertTriangle className="w-6 h-6 text-yellow-600 mb-2" />
-                  <h4 className="text-slate-900 font-semibold">Alertas del Sistema</h4>
-                  <p className="text-sm text-slate-600">3 productos con stock bajo</p>
-                </div>
-                <div className="p-4 bg-white rounded-lg border border-yellow-200">
-                  <Users className="w-6 h-6 text-blue-600 mb-2" />
-                  <h4 className="text-slate-900 font-semibold">Gestión de Usuarios</h4>
-                  <p className="text-sm text-slate-600">5 usuarios activos</p>
-                </div>
-                <div className="p-4 bg-white rounded-lg border border-yellow-200">
-                  <BarChart3 className="w-6 h-6 text-purple-600 mb-2" />
-                  <h4 className="text-slate-900 font-semibold">Reportes Avanzados</h4>
-                  <p className="text-sm text-slate-600">Análisis completo disponible</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                <Button
+                  onClick={() => navigate("/ventas")}
+                  variant="outline"
+                  className="h-20 flex-col gap-2 hover:bg-blue-50 hover:border-blue-300"
+                >
+                  <ShoppingCart className="w-6 h-6 text-blue-600" />
+                  <span className="text-sm">Nueva Venta</span>
+                </Button>
 
-        {/* Employee Limitations Notice */}
-        {user?.rol === "empleado" && (
-          <Card className="mt-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-slate-900 flex items-center">
-                <UserCheck className="w-5 h-5 mr-2 text-blue-600" />
-                Panel de Empleado
-              </CardTitle>
-              <CardDescription className="text-blue-700">Acceso a funciones operativas principales</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-white rounded-lg border border-blue-200">
-                  <ShoppingCart className="w-6 h-6 text-green-600 mb-2" />
-                  <h4 className="text-slate-900 font-semibold">Gestión de Ventas</h4>
-                  <p className="text-sm text-slate-600">Registra y gestiona ventas</p>
-                </div>
-                <div className="p-4 bg-white rounded-lg border border-blue-200">
-                  <Package className="w-6 h-6 text-blue-600 mb-2" />
-                  <h4 className="text-slate-900 font-semibold">Control de Compras</h4>
-                  <p className="text-sm text-slate-600">Registra compras de productos</p>
-                </div>
-                <div className="p-4 bg-white rounded-lg border border-blue-200">
-                  <CreditCard className="w-6 h-6 text-purple-600 mb-2" />
-                  <h4 className="text-slate-900 font-semibold">Cierre de Caja</h4>
-                  <p className="text-sm text-slate-600">Realiza cierres diarios</p>
-                </div>
+                <Button
+                  onClick={() => navigate("/stock")}
+                  variant="outline"
+                  className="h-20 flex-col gap-2 hover:bg-green-50 hover:border-green-300"
+                >
+                  <Package className="w-6 h-6 text-green-600" />
+                  <span className="text-sm">Gestión Stock</span>
+                </Button>
+
+                <Button
+                  onClick={() => navigate("/clientes")}
+                  variant="outline"
+                  className="h-20 flex-col gap-2 hover:bg-purple-50 hover:border-purple-300"
+                >
+                  <Users className="w-6 h-6 text-purple-600" />
+                  <span className="text-sm">Clientes</span>
+                </Button>
+
+                <Button
+                  onClick={() => navigate("/compras")}
+                  variant="outline"
+                  className="h-20 flex-col gap-2 hover:bg-orange-50 hover:border-orange-300"
+                >
+                  <Store className="w-6 h-6 text-orange-600" />
+                  <span className="text-sm">Compras</span>
+                </Button>
+
+                <Button
+                  onClick={() => navigate("/cuenta-corriente")}
+                  variant="outline"
+                  className="h-20 flex-col gap-2 hover:bg-indigo-50 hover:border-indigo-300"
+                >
+                  <CreditCard className="w-6 h-6 text-indigo-600" />
+                  <span className="text-sm">Cta. Corriente</span>
+                </Button>
+
+                <Button
+                  onClick={() => navigate("/reportes/ventas")}
+                  variant="outline"
+                  className="h-20 flex-col gap-2 hover:bg-slate-50 hover:border-slate-300"
+                >
+                  <FileText className="w-6 h-6 text-slate-600" />
+                  <span className="text-sm">Reportes</span>
+                </Button>
               </div>
             </CardContent>
           </Card>
-        )}
+
+          {/* Contenido principal en dos columnas */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Productos con stock bajo */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-orange-500" />
+                    Productos con Stock Bajo
+                  </CardTitle>
+                  <Button onClick={() => navigate("/stock")} variant="outline" size="sm">
+                    Ver todos
+                    <ArrowRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </div>
+                <CardDescription>Productos que requieren reposición urgente</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {lowStockProducts && lowStockProducts.length > 0 ? (
+                  <div className="space-y-4">
+                    {lowStockProducts.slice(0, 5).map((product) => (
+                      <div
+                        key={product.id}
+                        className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs bg-white px-2 py-1 rounded border">
+                              {product.codigo}
+                            </span>
+                            <Badge variant="outline" className={getStockStatusColor(product)}>
+                              Stock: {product.stock}
+                            </Badge>
+                          </div>
+                          <h4 className="font-medium text-slate-900 mt-1">{product.nombre}</h4>
+                          <p className="text-sm text-slate-600">
+                            Mínimo: {product.stock_minimo} | Marca: {product.marca || "Sin marca"}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold text-green-600">{formatCurrency(product.precio_venta)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-green-500" />
+                    <p className="text-slate-600 font-medium">¡Excelente!</p>
+                    <p className="text-sm text-slate-500">No hay productos con stock bajo</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Ventas recientes */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-blue-500" />
+                    Ventas Recientes
+                  </CardTitle>
+                  <Button onClick={() => navigate("/reportes/ventas")} variant="outline" size="sm">
+                    Ver todas
+                    <ArrowRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </div>
+                <CardDescription>Últimas transacciones realizadas</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {recentSales && recentSales.length > 0 ? (
+                  <div className="space-y-4">
+                    {recentSales.slice(0, 5).map((sale) => (
+                      <div
+                        key={sale.id}
+                        className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-blue-600" />
+                            <span className="font-mono text-sm font-medium">{sale.numero_factura}</span>
+                            <Badge
+                              variant="outline"
+                              className={
+                                sale.estado === "completada"
+                                  ? "border-green-200 text-green-700 bg-green-50"
+                                  : "border-red-200 text-red-700 bg-red-50"
+                              }
+                            >
+                              {sale.estado === "completada" ? "Completada" : "Anulada"}
+                            </Badge>
+                          </div>
+                          <p className="font-medium text-slate-900 mt-1">{sale.cliente_nombre || "Consumidor Final"}</p>
+                          <p className="text-sm text-slate-600">{formatDate(sale.fecha_venta)}</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold text-green-600">{formatCurrency(sale.total)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <ShoppingCart className="w-12 h-12 mx-auto mb-3 text-slate-400" />
+                    <p className="text-slate-600 font-medium">No hay ventas recientes</p>
+                    <p className="text-sm text-slate-500">Las ventas aparecerán aquí</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Modal de búsqueda detallada */}
+          <ProductQuickSearchModal
+            isOpen={isQuickSearchModalOpen}
+            onClose={() => setIsQuickSearchModalOpen(false)}
+            searchResults={searchResults}
+            searchTerm={quickSearchTerm}
+            onNavigateToStock={() => navigate("/stock")}
+          />
+        </div>
       </div>
     </Layout>
   )

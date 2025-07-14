@@ -1,29 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Package, Plus, Minus, CheckCircle, AlertCircle, Truck } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card" // Import Card components
+import { Package, Plus, Minus, CheckCircle, AlertCircle, Truck, X } from "lucide-react" // Added X icon
+import { formatCurrency } from "@/lib/utils" // Assuming formatCurrency is in lib/utils
+import { usePurchases } from "@/hooks/usePurchase" // Assuming usePurchases is in hooks/usePurchase
 import toast from "react-hot-toast"
-
-import { usePurchases } from "../../hooks/usePurchase"
-
-// Componente para formatear precios
-const PriceDisplay = ({ value, className = "" }) => {
-  return (
-    <span className={className}>
-      {new Intl.NumberFormat("es-AR", {
-        style: "currency",
-        currency: "ARS",
-        minimumFractionDigits: 2,
-      }).format(value || 0)}
-    </span>
-  )
-}
 
 export default function ReceiveProductsModal({ isOpen, onClose, purchase, onReceive }) {
   const { getPurchaseById } = usePurchases()
@@ -152,196 +139,231 @@ export default function ReceiveProductsModal({ isOpen, onClose, purchase, onRece
     0,
   )
 
-  if (!purchase) return null
+  if (!isOpen || !purchase) return null
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <Truck className="h-5 w-5 text-green-600" />
-            <span>Recibir Productos - {purchase.numero_compra}</span>
-          </DialogTitle>
-        </DialogHeader>
-
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-          </div>
-        ) : detailedPurchase ? (
-          <div className="space-y-6">
-            {/* Información de la compra */}
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <span className="text-sm text-gray-600">Proveedor:</span>
-                  <p className="font-medium">{detailedPurchase.proveedor_nombre}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-600">Fecha:</span>
-                  <p className="font-medium">{new Date(detailedPurchase.fecha_compra).toLocaleDateString("es-AR")}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-600">Total:</span>
-                  <PriceDisplay value={detailedPurchase.total} className="font-bold text-green-600" />
-                </div>
-              </div>
+    <>
+      {/* Overlay */}
+      <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[100] p-4">
+        {/* Modal Container */}
+        <div className="bg-white shadow-xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden relative z-[101]">
+          {/* Header */}
+          <div className="flex-shrink-0 flex items-center justify-between p-4 border-b bg-slate-800 text-white">
+            <div className="flex items-center space-x-3">
+              <Truck className="h-6 w-6 text-green-300" /> {/* Adjusted icon color for contrast */}
+              <span className="text-xl font-semibold">Recibir Productos - {purchase.numero_compra}</span>
             </div>
+            <Button
+              onClick={onClose}
+              variant="ghost"
+              size="sm"
+              className="text-slate-300 hover:text-white hover:bg-slate-700"
+              disabled={saving}
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
 
-            {receiveData.length > 0 ? (
-              <>
-                {/* Controles rápidos */}
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold">Productos Pendientes de Recepción</h3>
-                  <div className="space-x-2">
-                    <Button variant="outline" size="sm" onClick={clearQuantities}>
-                      Limpiar
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={receiveAllPending}>
-                      Recibir Todo
-                    </Button>
-                  </div>
-                </div>
+          {/* Scrollable Content Area */}
+          <div className="flex-1 overflow-y-auto p-6 max-h-[calc(90vh-120px)]">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+              </div>
+            ) : detailedPurchase ? (
+              <div className="space-y-6">
+                {/* Información de la compra */}
+                <Card className="border border-slate-800">
+                  <CardHeader>
+                    <CardTitle>Información de la Compra</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <span className="text-sm text-gray-600">Proveedor:</span>
+                        <p className="font-medium">{detailedPurchase.proveedor_nombre}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-600">Fecha:</span>
+                        <p className="font-medium">
+                          {new Date(detailedPurchase.fecha_compra).toLocaleDateString("es-AR")}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-600">Total:</span>
+                        <span className="font-bold text-green-600">{formatCurrency(detailedPurchase.total)}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-                {/* Tabla de productos */}
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Producto</TableHead>
-                        <TableHead className="text-center">Pendiente</TableHead>
-                        <TableHead className="text-center">A Recibir</TableHead>
-                        <TableHead className="text-right">Precio Unit.</TableHead>
-                        <TableHead className="text-right">Subtotal</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {receiveData.map((item) => (
-                        <TableRow key={item.detalleId}>
-                          <TableCell>
+                {receiveData.length > 0 ? (
+                  <>
+                    {/* Controles rápidos */}
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-semibold">Productos Pendientes de Recepción</h3>
+                      <div className="space-x-2">
+                        <Button variant="outline" size="sm" onClick={clearQuantities}>
+                          Limpiar
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={receiveAllPending}>
+                          Recibir Todo
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Tabla de productos */}
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Producto</TableHead>
+                            <TableHead className="text-center">Pendiente</TableHead>
+                            <TableHead className="text-center">A Recibir</TableHead>
+                            <TableHead className="text-right">Precio Unit.</TableHead>
+                            <TableHead className="text-right">Subtotal</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {receiveData.map((item) => (
+                            <TableRow key={item.detalleId}>
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium">{item.producto.producto_nombre}</div>
+                                  <div className="text-sm text-gray-500">
+                                    {item.producto.producto_codigo} • {item.producto.producto_marca || "Sin marca"}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Badge variant="secondary" className="bg-yellow-100 text-yellow-700">
+                                  {item.cantidadPendiente}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center justify-center space-x-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => decrementQuantity(item.detalleId)}
+                                    disabled={item.cantidadRecibida <= 0}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <Minus className="h-4 w-4" />
+                                  </Button>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max={item.cantidadPendiente}
+                                    value={item.cantidadRecibida}
+                                    onChange={(e) =>
+                                      updateReceiveQuantity(item.detalleId, Number.parseInt(e.target.value) || 0)
+                                    }
+                                    className="w-20 text-center h-8"
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => incrementQuantity(item.detalleId)}
+                                    disabled={item.cantidadRecibida >= item.cantidadPendiente}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {formatCurrency(item.producto.precio_unitario)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span
+                                  className={item.cantidadRecibida > 0 ? "font-medium text-green-600" : "text-gray-400"}
+                                >
+                                  {formatCurrency(item.cantidadRecibida * item.producto.precio_unitario)}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    {/* Resumen de recepción */}
+                    {totalItemsToReceive > 0 && (
+                      <Card className="p-4 bg-green-50 rounded-lg border border-slate-800">
+                        {" "}
+                        {/* Changed border to slate-800 */}
+                        <CardHeader className="p-0 pb-3">
+                          <CardTitle className="flex items-center space-x-2">
+                            <CheckCircle className="h-5 w-5 text-green-600" />
+                            <h4 className="font-semibold text-green-800">Resumen de Recepción</h4>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                              <div className="font-medium">{item.producto.producto_nombre}</div>
-                              <div className="text-sm text-gray-500">
-                                {item.producto.producto_codigo} • {item.producto.producto_marca || "Sin marca"}
-                              </div>
+                              <span className="text-sm text-green-700">Total de productos a recibir:</span>
+                              <p className="font-bold text-green-800">{totalItemsToReceive} unidades</p>
                             </div>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-700">
-                              {item.cantidadPendiente}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-center space-x-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => decrementQuantity(item.detalleId)}
-                                disabled={item.cantidadRecibida <= 0}
-                                className="h-8 w-8 p-0"
-                              >
-                                <Minus className="h-4 w-4" />
-                              </Button>
-                              <Input
-                                type="number"
-                                min="0"
-                                max={item.cantidadPendiente}
-                                value={item.cantidadRecibida}
-                                onChange={(e) =>
-                                  updateReceiveQuantity(item.detalleId, Number.parseInt(e.target.value) || 0)
-                                }
-                                className="w-20 text-center h-8"
-                              />
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => incrementQuantity(item.detalleId)}
-                                disabled={item.cantidadRecibida >= item.cantidadPendiente}
-                                className="h-8 w-8 p-0"
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
+                            <div>
+                              <span className="text-sm text-green-700">Valor total a recibir:</span>
+                              <span className="font-bold text-green-800">{formatCurrency(totalValueToReceive)}</span>
                             </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <PriceDisplay value={item.producto.precio_unitario} />
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <PriceDisplay
-                              value={item.cantidadRecibida * item.producto.precio_unitario}
-                              className={item.cantidadRecibida > 0 ? "font-medium text-green-600" : "text-gray-400"}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
 
-                {/* Resumen de recepción */}
-                {totalItemsToReceive > 0 && (
-                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                    <div className="flex items-center space-x-2 mb-3">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                      <h4 className="font-semibold text-green-800">Resumen de Recepción</h4>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <span className="text-sm text-green-700">Total de productos a recibir:</span>
-                        <p className="font-bold text-green-800">{totalItemsToReceive} unidades</p>
-                      </div>
-                      <div>
-                        <span className="text-sm text-green-700">Valor total a recibir:</span>
-                        <PriceDisplay value={totalValueToReceive} className="font-bold text-green-800" />
-                      </div>
-                    </div>
+                    {/* Alerta informativa */}
+                    <Alert className="border border-slate-800">
+                      {" "}
+                      {/* Added border */}
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Al confirmar la recepción, se actualizará automáticamente el stock de los productos y se
+                        registrarán los movimientos correspondientes.
+                      </AlertDescription>
+                    </Alert>
+                  </>
+                ) : (
+                  <div className="text-center py-12">
+                    <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Todos los productos recibidos</h3>
+                    <p className="text-gray-500">Esta compra ya tiene todos sus productos completamente recibidos.</p>
                   </div>
                 )}
-
-                {/* Alerta informativa */}
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Al confirmar la recepción, se actualizará automáticamente el stock de los productos y se registrarán
-                    los movimientos correspondientes.
-                  </AlertDescription>
-                </Alert>
-              </>
+              </div>
             ) : (
               <div className="text-center py-12">
-                <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Todos los productos recibidos</h3>
-                <p className="text-gray-500">Esta compra ya tiene todos sus productos completamente recibidos.</p>
+                <p className="text-gray-500">Error al cargar los detalles de la compra</p>
               </div>
             )}
           </div>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-gray-500">Error al cargar los detalles de la compra</p>
-          </div>
-        )}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>
-            Cancelar
-          </Button>
-          {receiveData.length > 0 && totalItemsToReceive > 0 && (
-            <Button onClick={handleConfirmReceive} disabled={saving} className="bg-green-600 hover:bg-green-700">
-              {saving ? (
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Procesando...</span>
-                </div>
-              ) : (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Confirmar Recepción
-                </>
-              )}
+          {/* Footer */}
+          <div className="flex-shrink-0 flex justify-end space-x-3 p-4 border-t">
+            <Button variant="outline" onClick={onClose} disabled={saving} className="border-slate-800">
+              <X className="h-4 w-4 mr-2" />
+              Cancelar
             </Button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            {receiveData.length > 0 && totalItemsToReceive > 0 && (
+              <Button onClick={handleConfirmReceive} disabled={saving} className="bg-green-600 hover:bg-green-700">
+                {saving ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Procesando...</span>
+                  </div>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Confirmar Recepción
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
   )
 }

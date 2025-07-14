@@ -12,7 +12,6 @@ import {
   Search,
   Filter,
   RefreshCw,
-  Download,
   Eye,
   FileText,
   Building,
@@ -32,34 +31,27 @@ import {
   CheckCircle2,
   History,
   PieChart,
+  Trash2,
   Truck,
-  AlertTriangle,
-  XCircle,
-  Package,
 } from "lucide-react"
-import PurchaseDetailsModal from "../components/reportes-compras/PurchaseDetailsModal"
-import ReceiveProductsModal from "../components/reportes-compras/ReceiveProductsModal"
-import StatusUpdateModal from "../components/reportes-compras/StatusUpdateModal"
 import { usePurchasesReports } from "../hooks/usePurchasesReports"
 import { formatCurrency } from "../lib/utils"
 import { extractExactDateTime } from "../lib/date-utils"
 import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert"
+import PurchaseDetailsModal from "../components/reportes-compras/PurchaseDetailsModal"
+import CancelPurchaseModal from "../components/reportes-compras/CancelPurchaseModal"
+import ReceiveProductsModal from "../components/reportes-compras/ReceiveProductsModal"
+import { usePurchases } from "../hooks/usePurchase"
+import Pagination from "../components/ui/Pagination"
+import { Loading, LoadingOverlay } from "../components/ui/loading"
 
 const ReporteCompras = () => {
-  const [filters, setFilters] = useState({
-    fechaInicio: "",
-    fechaFin: "",
-    proveedor: "",
-    numeroCompra: "",
-    estado: "todos",
-    tipoPago: "todos",
-  })
-
   const [selectedPurchase, setSelectedPurchase] = useState(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false)
-  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
+  const [showFilterCard, setShowFilterCard] = useState(false)
   const [activeTab, setActiveTab] = useState("historial")
 
   const {
@@ -67,13 +59,15 @@ const ReporteCompras = () => {
     stats,
     loading,
     error,
+    pagination,
     fetchPurchases,
     fetchStats,
-    exportPurchases,
     getPurchaseById,
-    updatePurchaseStatus,
-    receivePurchaseItems,
+    updateFilters,
+    handlePageChange,
   } = usePurchasesReports()
+
+  const { receivePurchaseItems, cancelPurchase } = usePurchases()
 
   // Cargar datos iniciales (últimos 30 días)
   useEffect(() => {
@@ -81,27 +75,36 @@ const ReporteCompras = () => {
     const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
 
     const initialFilters = {
-      ...filters,
       fechaInicio: thirtyDaysAgo.toISOString().split("T")[0],
       fechaFin: today.toISOString().split("T")[0],
+      offset: 0,
     }
 
-    setFilters(initialFilters)
-    handleApplyFilters(initialFilters)
-  }, [])
-
-  const handleApplyFilters = async (customFilters = filters) => {
-    await Promise.all([fetchPurchases(customFilters), fetchStats(customFilters)])
-  }
+    updateFilters(initialFilters)
+  }, [updateFilters])
 
   const handleFilterChange = (field, value) => {
-    const newFilters = { ...filters, [field]: value }
-    setFilters(newFilters)
+    const newFilters = { [field]: value }
 
-    // Auto-aplicar filtros para búsqueda rápida
-    if (field === "proveedor" || field === "numeroCompra") {
+    // Reset offset cuando se cambian filtros
+    if (field !== "offset") {
+      newFilters.offset = 0
+    }
+
+    updateFilters(newFilters)
+
+    // Auto-aplicar filtros para búsqueda rápida y avanzados
+    if (
+      field === "proveedor" ||
+      field === "numeroCompra" ||
+      field === "estado" ||
+      field === "tipoPago" ||
+      field === "fechaInicio" ||
+      field === "fechaFin"
+    ) {
       const timeoutId = setTimeout(() => {
-        handleApplyFilters(newFilters)
+        fetchPurchases(newFilters)
+        fetchStats(newFilters)
       }, 500)
       return () => clearTimeout(timeoutId)
     }
@@ -112,13 +115,14 @@ const ReporteCompras = () => {
     const startDate = new Date(today.getTime() - days * 24 * 60 * 60 * 1000)
 
     const newFilters = {
-      ...filters,
       fechaInicio: startDate.toISOString().split("T")[0],
       fechaFin: today.toISOString().split("T")[0],
+      offset: 0,
     }
 
-    setFilters(newFilters)
-    handleApplyFilters(newFilters)
+    updateFilters(newFilters)
+    fetchPurchases(newFilters)
+    fetchStats(newFilters)
   }
 
   const handleResetFilters = () => {
@@ -129,9 +133,11 @@ const ReporteCompras = () => {
       numeroCompra: "",
       estado: "todos",
       tipoPago: "todos",
+      offset: 0,
     }
-    setFilters(resetFilters)
-    handleApplyFilters(resetFilters)
+    updateFilters(resetFilters)
+    fetchPurchases(resetFilters)
+    fetchStats(resetFilters)
   }
 
   const handleViewPurchaseDetails = async (purchaseId) => {
@@ -139,6 +145,14 @@ const ReporteCompras = () => {
     if (result.success) {
       setSelectedPurchase(result.data)
       setIsDetailsModalOpen(true)
+    }
+  }
+
+  const handleCancelPurchase = async (purchaseId) => {
+    const result = await getPurchaseById(purchaseId)
+    if (result.success) {
+      setSelectedPurchase(result.data)
+      setIsCancelModalOpen(true)
     }
   }
 
@@ -150,16 +164,9 @@ const ReporteCompras = () => {
     }
   }
 
-  const handleChangeStatus = async (purchaseId) => {
-    const result = await getPurchaseById(purchaseId)
-    if (result.success) {
-      setSelectedPurchase(result.data)
-      setIsStatusModalOpen(true)
-    }
-  }
-
-  const handleExport = async () => {
-    await exportPurchases(filters)
+  const handleRefresh = () => {
+    fetchPurchases({ offset: 0 })
+    fetchStats()
   }
 
   // Función para determinar el método de pago principal
@@ -191,6 +198,11 @@ const ReporteCompras = () => {
         icon: Banknote,
         color: "bg-green-100 text-green-800 border-green-200",
       },
+      transferencia: {
+        label: "Transferencia",
+        icon: Smartphone,
+        color: "bg-purple-100 text-purple-800 border-purple-200",
+      },
       tarjeta_credito: {
         label: "Tarjeta Crédito",
         icon: CreditCard,
@@ -199,12 +211,7 @@ const ReporteCompras = () => {
       tarjeta_debito: {
         label: "Tarjeta Débito",
         icon: CreditCard,
-        color: "bg-indigo-100 text-indigo-800 border-indigo-200",
-      },
-      transferencia: {
-        label: "Transferencia",
-        icon: Smartphone,
-        color: "bg-purple-100 text-purple-800 border-purple-200",
+        color: "bg-cyan-100 text-cyan-800 border-cyan-200",
       },
       otro: {
         label: "Otro",
@@ -222,42 +229,6 @@ const ReporteCompras = () => {
     )
   }
 
-  // Función para obtener el badge de estado
-  const getStatusBadge = (estado) => {
-    const statusConfig = {
-      pendiente: {
-        label: "Pendiente",
-        icon: Clock,
-        color: "border-yellow-200 text-yellow-700 bg-yellow-50",
-      },
-      parcial: {
-        label: "Parcial",
-        icon: AlertTriangle,
-        color: "border-orange-200 text-orange-700 bg-orange-50",
-      },
-      recibida: {
-        label: "Recibida",
-        icon: CheckCircle2,
-        color: "border-green-200 text-green-700 bg-green-50",
-      },
-      cancelada: {
-        label: "Cancelada",
-        icon: XCircle,
-        color: "border-red-200 text-red-700 bg-red-50",
-      },
-    }
-
-    const config = statusConfig[estado] || statusConfig.pendiente
-    const IconComponent = config.icon
-
-    return (
-      <Badge variant="outline" className={config.color}>
-        <IconComponent className="w-3 h-3 mr-1" />
-        <span className="text-xs">{config.label}</span>
-      </Badge>
-    )
-  }
-
   // Calcular estadísticas adicionales
   const calculateAdditionalStats = () => {
     if (!stats) return {}
@@ -265,13 +236,13 @@ const ReporteCompras = () => {
     const comprasHoy = purchases.filter((purchase) => {
       const today = new Date().toISOString().split("T")[0]
       const purchaseDate = new Date(purchase.fecha_compra).toISOString().split("T")[0]
-      return purchaseDate === today && purchase.estado !== "cancelada"
+      return purchaseDate === today
     }).length
 
     const comprasAyer = purchases.filter((purchase) => {
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split("T")[0]
       const purchaseDate = new Date(purchase.fecha_compra).toISOString().split("T")[0]
-      return purchaseDate === yesterday && purchase.estado !== "cancelada"
+      return purchaseDate === yesterday
     }).length
 
     const crecimiento = comprasAyer > 0 ? ((comprasHoy - comprasAyer) / comprasAyer) * 100 : 0
@@ -286,6 +257,26 @@ const ReporteCompras = () => {
 
   const additionalStats = calculateAdditionalStats()
 
+  // Función para verificar si se pueden recibir productos
+  const canReceiveProducts = (purchase) => {
+    return purchase.estado === "pendiente" || purchase.estado === "parcial"
+  }
+
+  // Función para verificar si se puede cancelar la compra
+  const canCancelPurchase = (purchase) => {
+    return purchase.estado !== "cancelada"
+  }
+
+  if (loading && purchases.length === 0) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
+          <Loading text="Cargando reportes de compras..." size="lg" />
+        </div>
+      </Layout>
+    )
+  }
+
   return (
     <Layout>
       <div className="min-h-screen bg-gray-50/50">
@@ -296,20 +287,16 @@ const ReporteCompras = () => {
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">Reportes de Compras</h1>
                 <p className="text-muted-foreground mt-2">
-                  Análisis detallado de compras, gestión de proveedores y control de inventario
+                  Análisis detallado del rendimiento de compras y gestión de proveedores
                 </p>
               </div>
               <div className="flex gap-2">
-                <Button onClick={() => setShowFilters(!showFilters)} variant="outline" disabled={loading}>
+                <Button onClick={() => setShowFilterCard(!showFilterCard)} variant="outline" disabled={loading}>
                   <Filter className="w-4 h-4 mr-2" />
-                  Filtros
-                  {showFilters ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}
+                  {showFilterCard ? "Ocultar Filtros" : "Mostrar Filtros"}
+                  {showFilterCard ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}
                 </Button>
-                <Button onClick={handleExport} variant="outline" disabled={loading}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Exportar
-                </Button>
-                <Button onClick={() => handleApplyFilters()} disabled={loading} className="bg-slate-800 hover:bg-slate-900">
+                <Button onClick={handleRefresh} disabled={loading} className="bg-slate-800 hover:bg-slate-900">
                   <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
                   Actualizar
                 </Button>
@@ -318,158 +305,187 @@ const ReporteCompras = () => {
           </div>
 
           {/* Filtros */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Search className="w-5 h-5" />
-                Filtros y Búsqueda
-              </CardTitle>
-              <CardDescription>Filtra las compras por período, proveedor, estado y método de pago</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {/* Búsqueda rápida */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="proveedor">Buscar proveedor</Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                      <Input
-                        id="proveedor"
-                        placeholder="Nombre del proveedor..."
-                        value={filters.proveedor}
-                        onChange={(e) => handleFilterChange("proveedor", e.target.value)}
-                        className="pl-10 border-slate-800" 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="numeroCompra">Número de compra</Label>
-                    <div className="relative">
-                      <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                      <Input
-                        id="numeroCompra"
-                        placeholder="Número de compra..."
-                        value={filters.numeroCompra}
-                        onChange={(e) => handleFilterChange("numeroCompra", e.target.value)}
-                        className="pl-10 border-slate-800"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Períodos rápidos</Label>
-                    <div className="flex gap-2">
-                      <Button onClick={() => handleQuickDateFilter(7)} variant="outline" size="sm" className="flex-1 h-10 border-slate-800">
-                        <Clock className="w-4 h-4 mr-1" />7 días
-                      </Button>
-                      <Button onClick={() => handleQuickDateFilter(30)} variant="outline" size="sm" className="flex-1 h-10 border-slate-800">
-                        30 días
-                      </Button>
-                      <Button onClick={() => handleQuickDateFilter(90)} variant="outline" size="sm" className="flex-1 h-10 border-slate-800">
-                        90 días
-                      </Button>
-                    </div>
-                  </div>
+          {showFilterCard && (
+            <Card className="mb-6">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Search className="w-5 h-5" />
+                    Filtros y Búsqueda
+                  </CardTitle>
+                  <Button
+                    onClick={() => setShowFilters(!showFilters)}
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:bg-muted"
+                    title={showFilters ? "Ocultar filtros avanzados" : "Mostrar filtros avanzados"}
+                  >
+                    {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    <span className="sr-only">
+                      {showFilters ? "Ocultar filtros avanzados" : "Mostrar filtros avanzados"}
+                    </span>
+                  </Button>
                 </div>
-
-                {/* Filtros avanzados */}
-                {showFilters && (
-                  <div className="border-t pt-4 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="fechaInicio">Fecha inicio</Label>
-                        <div className="relative">
-                          <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                          <Input
-                            id="fechaInicio"
-                            type="date"
-                            value={filters.fechaInicio}
-                            onChange={(e) => handleFilterChange("fechaInicio", e.target.value)}
-                            className="pl-10"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="fechaFin">Fecha fin</Label>
-                        <div className="relative">
-                          <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                          <Input
-                            id="fechaFin"
-                            type="date"
-                            value={filters.fechaFin}
-                            onChange={(e) => handleFilterChange("fechaFin", e.target.value)}
-                            className="pl-10"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="estado">Estado</Label>
-                        <select
-                          id="estado"
-                          value={filters.estado}
-                          onChange={(e) => handleFilterChange("estado", e.target.value)}
-                          className="w-full h-10 px-3 border border-input rounded-md text-sm focus:border-ring focus:ring-ring/20"
-                        >
-                          <option value="todos">Todos los estados</option>
-                          <option value="pendiente">Pendientes</option>
-                          <option value="parcial">Parciales</option>
-                          <option value="recibida">Recibidas</option>
-                          <option value="cancelada">Canceladas</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="tipoPago">Método de pago</Label>
-                        <select
-                          id="tipoPago"
-                          value={filters.tipoPago}
-                          onChange={(e) => handleFilterChange("tipoPago", e.target.value)}
-                          className="w-full h-10 px-3 border border-input rounded-md text-sm focus:border-ring focus:ring-ring/20"
-                        >
-                          <option value="todos">Todos los métodos</option>
-                          <option value="efectivo">Efectivo</option>
-                          <option value="tarjeta_credito">Tarjeta Crédito</option>
-                          <option value="tarjeta_debito">Tarjeta Débito</option>
-                          <option value="transferencia">Transferencia</option>
-                          <option value="varios">Varios métodos</option>
-                          <option value="otro">Otro</option>
-                        </select>
+                <CardDescription>
+                  Filtra las compras por período, proveedor, método de pago y más criterios
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Búsqueda rápida */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="proveedor">Buscar proveedor</Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                        <Input
+                          id="proveedor"
+                          placeholder="Nombre del proveedor..."
+                          value={pagination.proveedor || ""}
+                          onChange={(e) => handleFilterChange("proveedor", e.target.value)}
+                          className="pl-10 border-slate-800"
+                        />
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-center pt-4 border-t">
-                      <div className="text-sm text-muted-foreground">
-                        {purchases.length} compra{purchases.length !== 1 ? "s" : ""} encontrada
-                        {purchases.length !== 1 ? "s" : ""}
+                    <div className="space-y-2">
+                      <Label htmlFor="numeroCompra">Número de compra</Label>
+                      <div className="relative">
+                        <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                        <Input
+                          id="numeroCompra"
+                          placeholder="Número de compra..."
+                          value={pagination.numeroCompra || ""}
+                          onChange={(e) => handleFilterChange("numeroCompra", e.target.value)}
+                          className="pl-10 border-slate-800"
+                        />
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Períodos rápidos</Label>
                       <div className="flex gap-2">
-                        <Button onClick={handleResetFilters} variant="outline" size="sm">
-                          <X className="w-4 h-4 mr-2" />
-                          Limpiar Filtros
+                        <Button
+                          onClick={() => handleQuickDateFilter(7)}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 h-10 border-slate-800"
+                        >
+                          <Clock className="w-4 h-4 mr-1" />7 días
                         </Button>
-                        <Button onClick={() => handleApplyFilters()} size="sm">
-                          <Filter className="w-4 h-4 mr-2" />
-                          Aplicar Filtros
+                        <Button
+                          onClick={() => handleQuickDateFilter(30)}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 h-10 border-slate-800"
+                        >
+                          30 días
+                        </Button>
+                        <Button
+                          onClick={() => handleQuickDateFilter(90)}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 h-10 border-slate-800"
+                        >
+                          90 días
                         </Button>
                       </div>
                     </div>
                   </div>
-                )}
 
-                {error && (
-                  <Alert className="border-red-200 bg-red-50">
-                    <AlertCircle className="h-4 w-4 text-red-600" />
-                    <AlertTitle className="text-red-900">Error</AlertTitle>
-                    <AlertDescription className="text-red-800">{error}</AlertDescription>
-                  </Alert>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  {/* Filtros avanzados */}
+                  {showFilters && (
+                    <div className="border-t pt-4 space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="fechaInicio">Fecha inicio</Label>
+                          <div className="relative">
+                            <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                            <Input
+                              id="fechaInicio"
+                              type="date"
+                              value={pagination.fechaInicio || ""}
+                              onChange={(e) => handleFilterChange("fechaInicio", e.target.value)}
+                              className="pl-10"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="fechaFin">Fecha fin</Label>
+                          <div className="relative">
+                            <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                            <Input
+                              id="fechaFin"
+                              type="date"
+                              value={pagination.fechaFin || ""}
+                              onChange={(e) => handleFilterChange("fechaFin", e.target.value)}
+                              className="pl-10"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="estado">Estado</Label>
+                          <select
+                            id="estado"
+                            value={pagination.estado || "todos"}
+                            onChange={(e) => handleFilterChange("estado", e.target.value)}
+                            className="w-full h-10 px-3 border border-input rounded-md text-sm focus:border-ring focus:ring-ring/20"
+                          >
+                            <option value="todos">Todos los estados</option>
+                            <option value="pendiente">Pendientes</option>
+                            <option value="recibida">Recibidas</option>
+                            <option value="parcial">Parciales</option>
+                            <option value="cancelada">Canceladas</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="tipoPago">Método de pago</Label>
+                          <select
+                            id="tipoPago"
+                            value={pagination.tipoPago || "todos"}
+                            onChange={(e) => handleFilterChange("tipoPago", e.target.value)}
+                            className="w-full h-10 px-3 border border-input rounded-md text-sm focus:border-ring focus:ring-ring/20"
+                          >
+                            <option value="todos">Todos los métodos</option>
+                            <option value="efectivo">Efectivo</option>
+                            <option value="transferencia">Transferencia</option>
+                            <option value="tarjeta_credito">Tarjeta Crédito</option>
+                            <option value="tarjeta_debito">Tarjeta Débito</option>
+                            <option value="varios">Varios métodos</option>
+                            <option value="otro">Otro</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center pt-4 border-t">
+                        <div className="text-sm text-muted-foreground">
+                          {pagination.totalItems} compra{pagination.totalItems !== 1 ? "s" : ""} encontrada
+                          {pagination.totalItems !== 1 ? "s" : ""}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button onClick={handleResetFilters} variant="outline" size="sm">
+                            <X className="w-4 h-4 mr-2" />
+                            Limpiar Filtros
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {error && (
+                    <Alert className="border-red-200 bg-red-50">
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                      <AlertTitle className="text-red-900">Error</AlertTitle>
+                      <AlertDescription className="text-red-800">{error}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Tabs para separar Historial y Reportes */}
           <Tabs defaultValue="historial" value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -495,135 +511,176 @@ const ReporteCompras = () => {
                         Historial de Compras
                       </CardTitle>
                       <CardDescription>
-                        {purchases.length} registro{purchases.length !== 1 ? "s" : ""} encontrado
-                        {purchases.length !== 1 ? "s" : ""}
+                        {pagination.totalItems} registro{pagination.totalItems !== 1 ? "s" : ""} encontrado
+                        {pagination.totalItems !== 1 ? "s" : ""}
                       </CardDescription>
                     </div>
                     <Badge variant="outline" className="w-fit">
-                      Total: {purchases.length}
+                      Total: {pagination.totalItems}
                     </Badge>
                   </div>
                 </CardHeader>
 
                 <CardContent className="-mt-3">
-                  {loading ? (
-                    <div className="flex flex-col items-center justify-center py-16">
-                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
-                      <p className="text-muted-foreground font-medium">Cargando compras...</p>
-                      <p className="text-sm text-muted-foreground mt-1">Esto puede tomar unos segundos</p>
-                    </div>
-                  ) : purchases.length === 0 ? (
-                    <div className="text-center py-16">
-                      <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                      <h3 className="text-lg font-medium text-muted-foreground mb-2">No se encontraron compras</h3>
-                      <p className="text-muted-foreground mb-4">
-                        No hay compras que coincidan con los filtros aplicados
-                      </p>
-                      <Button onClick={handleResetFilters} variant="outline" size="sm">
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Limpiar filtros
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-slate-800">
-                          <tr className="border-b">
-                            <th className="text-slate-100 text-left py-3 px-4 font-medium text-muted-foreground">Número</th>
-                            <th className="text-slate-100 text-left py-3 px-4 font-medium text-muted-foreground">Fecha</th>
-                            <th className="text-slate-100 text-left py-3 px-4 font-medium text-muted-foreground">Proveedor</th>
-                            <th className="text-slate-100 text-left py-3 px-4 font-medium text-muted-foreground">Total</th>
-                            <th className="text-slate-100 text-center py-3 px-4 font-medium text-muted-foreground">Método de Pago</th>
-                            <th className="text-slate-100 text-center py-3 px-4 font-medium text-muted-foreground">Estado</th>
-                            <th className="text-slate-100 text-center py-3 px-4 font-medium text-muted-foreground">Acciones</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {purchases.map((purchase, index) => {
-                            const paymentMethod = getPaymentMethodDisplay(purchase)
-                            const IconComponent = paymentMethod.icon
-                            const dateTime = extractExactDateTime(purchase.fecha_creacion)
+                  <LoadingOverlay loading={loading && purchases.length > 0} text="Actualizando...">
+                    {purchases.length === 0 && !loading ? (
+                      <div className="text-center py-16">
+                        <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                        <h3 className="text-lg font-medium text-muted-foreground mb-2">No se encontraron compras</h3>
+                        <p className="text-muted-foreground mb-4">
+                          No hay compras que coincidan con los filtros aplicados
+                        </p>
+                        <Button onClick={handleResetFilters} variant="outline" size="sm">
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Limpiar filtros
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-slate-800">
+                            <tr className="border-b">
+                              <th className="text-slate-100 text-left py-3 px-4 font-medium">Compra</th>
+                              <th className="text-slate-100 text-left py-3 px-4 font-medium">Fecha</th>
+                              <th className="text-slate-100 text-left py-3 px-4 font-medium">Proveedor</th>
+                              <th className="text-slate-100 text-left py-3 px-4 font-medium">Total</th>
+                              <th className="text-slate-100 text-center py-3 px-4 font-medium">Método de Pago</th>
+                              <th className="text-slate-100 text-center py-3 px-4 font-medium">Estado</th>
+                              <th className="text-slate-100 text-center py-3 px-4 font-medium">Acciones</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {purchases.map((purchase) => {
+                              const paymentMethod = getPaymentMethodDisplay(purchase)
+                              const IconComponent = paymentMethod.icon
+                              const dateTime = extractExactDateTime(purchase.fecha_creacion)
 
-                            return (
-                              <tr key={purchase.id} className="border-b hover:bg-muted/50 transition-colors">
-                                <td className="py-3 px-4">
-                                  <div className="flex items-center gap-2">
-                                    <FileText className="w-4 h-4 text-muted-foreground" />
-                                    <span className="font-mono font-medium text-sm">{purchase.numero_compra}</span>
-                                  </div>
-                                </td>
-
-                                <td className="py-3 px-4">
-                                  <div>
-                                    <span className="text-sm font-medium">{dateTime.date}</span>
-                                    <p className="text-xs text-muted-foreground">{dateTime.time}</p>
-                                  </div>
-                                </td>
-
-                                <td className="py-3 px-4">
-                                  <div className="flex items-center gap-2">
-                                    <Building className="w-4 h-4 text-muted-foreground" />
-                                    <span className="text-sm truncate max-w-xs">
-                                      {purchase.proveedor_nombre || "Proveedor no especificado"}
-                                    </span>
-                                  </div>
-                                </td>
-
-                                <td className="py-3 px-4">
-                                  <div>
-                                    <span className="font-bold text-green-600">
-                                      {formatCurrency(Number(purchase.total) || 0)}
-                                    </span>
-                                    {Number(purchase.descuento) > 0 && (
-                                      <p className="text-xs text-red-600 mt-1">
-                                        Desc: -{formatCurrency(Number(purchase.descuento))}
-                                      </p>
-                                    )}
-                                  </div>
-                                </td>
-
-                                <td className="py-3 px-4 text-center">
-                                  <Badge variant="outline" className={paymentMethod.color}>
-                                    <div className="flex items-center gap-1">
-                                      <IconComponent className="w-3 h-3" />
-                                      <span className="text-xs">{paymentMethod.label}</span>
+                              return (
+                                <tr key={purchase.id} className="border-b hover:bg-muted/50 transition-colors">
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-2">
+                                      <FileText className="w-4 h-4 text-muted-foreground" />
+                                      <span className="font-mono font-medium text-sm">{purchase.numero_compra}</span>
                                     </div>
-                                  </Badge>
-                                </td>
+                                  </td>
 
-                                <td className="py-3 px-4 text-center">{getStatusBadge(purchase.estado)}</td>
+                                  <td className="py-3 px-4">
+                                    <div>
+                                      <span className="text-sm font-medium">{dateTime.date}</span>
+                                      <p className="text-xs text-muted-foreground">{dateTime.time}</p>
+                                    </div>
+                                  </td>
 
-                                <td className="py-3 px-4 text-center">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <Button
-                                      size="sm"
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-2">
+                                      <Building className="w-4 h-4 text-muted-foreground" />
+                                      <span className="text-sm truncate max-w-xs">
+                                        {purchase.proveedor_nombre || "Proveedor no especificado"}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  <td className="py-3 px-4">
+                                    <div>
+                                      <span className="font-bold text-blue-600">
+                                        {formatCurrency(Number(purchase.total) || 0)}
+                                      </span>
+                                      {Number(purchase.descuento) > 0 && (
+                                        <p className="text-xs text-red-600 mt-1">
+                                          Desc: -{formatCurrency(Number(purchase.descuento))}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  <td className="py-3 px-4 text-center">
+                                    <Badge variant="outline" className={paymentMethod.color}>
+                                      <div className="flex items-center gap-1">
+                                        <IconComponent className="w-3 h-3" />
+                                        <span className="text-xs">{paymentMethod.label}</span>
+                                      </div>
+                                    </Badge>
+                                  </td>
+
+                                  <td className="py-3 px-4 text-center">
+                                    <Badge
                                       variant="outline"
-                                      onClick={() => handleViewPurchaseDetails(purchase.id)}
-                                      className="h-8 w-8 p-0"
-                                      title="Ver detalles"
+                                      className={
+                                        purchase.estado === "recibida"
+                                          ? "border-green-200 text-green-700 bg-green-50"
+                                          : purchase.estado === "pendiente"
+                                            ? "border-yellow-200 text-yellow-700 bg-yellow-50"
+                                            : purchase.estado === "parcial"
+                                              ? "border-blue-200 text-blue-700 bg-blue-50"
+                                              : purchase.estado === "cancelada"
+                                                ? "border-red-200 text-red-700 bg-red-50"
+                                                : "border-gray-200 text-gray-700 bg-gray-50"
+                                      }
                                     >
-                                      <Eye className="w-4 h-4" />
-                                    </Button>
-                                    {(purchase.estado === "pendiente" || purchase.estado === "parcial") && (
+                                      {purchase.estado === "recibida"
+                                        ? "Recibida"
+                                        : purchase.estado === "pendiente"
+                                          ? "Pendiente"
+                                          : purchase.estado === "parcial"
+                                            ? "Parcial"
+                                            : purchase.estado === "cancelada"
+                                              ? "Cancelada"
+                                              : "Sin estado"}
+                                    </Badge>
+                                  </td>
+
+                                  <td className="py-3 px-4 text-center">
+                                    <div className="flex items-center justify-center gap-1">
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        onClick={() => handleReceiveProducts(purchase.id)}
-                                        className="h-8 w-8 p-0 border-green-200 text-green-600 hover:bg-green-50 hover:border-green-300"
-                                        title="Recibir productos"
+                                        onClick={() => handleViewPurchaseDetails(purchase.id)}
+                                        className="h-8 w-8 p-0"
+                                        title="Ver detalles"
                                       >
-                                        <Truck className="w-4 h-4" />
+                                        <Eye className="w-4 h-4" />
                                       </Button>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+
+                                      {canReceiveProducts(purchase) && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => handleReceiveProducts(purchase.id)}
+                                          className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                                          title="Recibir productos"
+                                        >
+                                          <Truck className="w-4 h-4" />
+                                        </Button>
+                                      )}
+
+                                      {canCancelPurchase(purchase) && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => handleCancelPurchase(purchase.id)}
+                                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                          title="Cancelar compra"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </LoadingOverlay>
+                  <Pagination
+                    currentPage={pagination.currentPage}
+                    totalPages={pagination.totalPages}
+                    onPageChange={handlePageChange}
+                    totalItems={pagination.totalItems}
+                    itemsPerPage={pagination.itemsPerPage}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -668,17 +725,17 @@ const ReporteCompras = () => {
                   </Card>
 
                   {/* Monto Total */}
-                  <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                  <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-medium text-green-700">Inversión Total</p>
-                          <p className="text-2xl font-bold text-green-900">{formatCurrency(stats.montoTotal || 0)}</p>
-                          <p className="text-xs text-green-600 mt-2">
+                          <p className="text-sm font-medium text-purple-700">Monto Total</p>
+                          <p className="text-2xl font-bold text-purple-900">{formatCurrency(stats.montoTotal || 0)}</p>
+                          <p className="text-xs text-purple-600 mt-2">
                             Promedio: {formatCurrency(additionalStats.ticketPromedio)}
                           </p>
                         </div>
-                        <div className="p-3 bg-green-500 rounded-full">
+                        <div className="p-3 bg-purple-500 rounded-full">
                           <DollarSign className="w-6 h-6 text-white" />
                         </div>
                       </div>
@@ -686,20 +743,20 @@ const ReporteCompras = () => {
                   </Card>
 
                   {/* Compras Recibidas */}
-                  <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
+                  <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-medium text-emerald-700">Recibidas</p>
-                          <p className="text-3xl font-bold text-emerald-900">{stats.comprasRecibidas || 0}</p>
-                          <p className="text-xs text-emerald-600 mt-2">
+                          <p className="text-sm font-medium text-green-700">Recibidas</p>
+                          <p className="text-3xl font-bold text-green-900">{stats.comprasRecibidas || 0}</p>
+                          <p className="text-xs text-green-600 mt-2">
                             {stats.totalCompras > 0
                               ? (((stats.comprasRecibidas || 0) / stats.totalCompras) * 100).toFixed(1)
                               : 0}
                             % del total
                           </p>
                         </div>
-                        <div className="p-3 bg-emerald-500 rounded-full">
+                        <div className="p-3 bg-green-500 rounded-full">
                           <CheckCircle2 className="w-6 h-6 text-white" />
                         </div>
                       </div>
@@ -830,7 +887,13 @@ const ReporteCompras = () => {
             isOpen={isDetailsModalOpen}
             onClose={() => setIsDetailsModalOpen(false)}
             purchase={selectedPurchase}
-            onStatusChange={handleChangeStatus}
+          />
+
+          <CancelPurchaseModal
+            isOpen={isCancelModalOpen}
+            onClose={() => setIsCancelModalOpen(false)}
+            purchase={selectedPurchase}
+            onCancel={cancelPurchase}
           />
 
           <ReceiveProductsModal
@@ -838,13 +901,6 @@ const ReporteCompras = () => {
             onClose={() => setIsReceiveModalOpen(false)}
             purchase={selectedPurchase}
             onReceive={receivePurchaseItems}
-          />
-
-          <StatusUpdateModal
-            isOpen={isStatusModalOpen}
-            onClose={() => setIsStatusModalOpen(false)}
-            purchase={selectedPurchase}
-            onUpdate={updatePurchaseStatus}
           />
         </div>
       </div>
@@ -861,6 +917,12 @@ const formatPaymentType = (type) => {
       color: "text-green-600",
       bgColor: "bg-green-100",
     },
+    transferencia: {
+      label: "Transferencia",
+      icon: Smartphone,
+      color: "text-purple-600",
+      bgColor: "bg-purple-100",
+    },
     tarjeta_credito: {
       label: "Tarjeta Crédito",
       icon: CreditCard,
@@ -870,14 +932,8 @@ const formatPaymentType = (type) => {
     tarjeta_debito: {
       label: "Tarjeta Débito",
       icon: CreditCard,
-      color: "text-indigo-600",
-      bgColor: "bg-indigo-100",
-    },
-    transferencia: {
-      label: "Transferencia",
-      icon: Smartphone,
-      color: "text-purple-600",
-      bgColor: "bg-purple-100",
+      color: "text-cyan-600",
+      bgColor: "bg-cyan-100",
     },
     otro: {
       label: "Otro",

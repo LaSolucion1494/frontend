@@ -19,6 +19,9 @@ import Categorias from "./pages/Categorias"
 // Agregar la importación del componente ReporteVentas
 import ReporteVentas from "./pages/ReporteVentas"
 import CierreCaja from "./pages/CierreCaja"
+// Importar MovimientosTable para su nueva ruta
+import MovimientosTable from "./components/cuenta-corriente/MovimientosTable"
+import StockMovementsHistory from "./pages/StockMovementsHistory"
 
 function AppRoutes() {
   const { isAuthenticated, loading } = useAuth()
@@ -90,6 +93,14 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/reportes/historial-movimientos"
+        element={
+          <ProtectedRoute adminOnly>
+            <StockMovementsHistory />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Rutas de gestión (solo admin) */}
       <Route
@@ -113,6 +124,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute adminOnly>
             <CuentaCorriente />
+          </ProtectedRoute>
+        }
+      />
+      {/* Nueva ruta para movimientos de cuenta corriente */}
+      <Route
+        path="/cuenta-corriente/movimientos/:clienteId"
+        element={
+          <ProtectedRoute adminOnly>
+            <MovimientosTable />
           </ProtectedRoute>
         }
       />

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { productsService } from "../services/productsService"
 import toast from "react-hot-toast"
 
@@ -8,35 +8,84 @@ export const useProducts = (initialFilters = {}) => {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [sortConfig, setSortConfig] = useState({
+  const [filters, setFilters] = useState({
+    search: "",
+    categoria: "",
+    stockStatus: "todos",
+    activo: "true",
+    minPrice: "",
+    maxPrice: "",
     sortBy: "nombre",
     sortOrder: "asc",
+    limit: 10,
+    offset: 0,
     ...initialFilters,
   })
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10,
+  })
+
+  // Mantener compatibilidad con sortConfig
+  const sortConfig = {
+    sortBy: filters.sortBy,
+    sortOrder: filters.sortOrder,
+  }
 
   const fetchProducts = useCallback(
     async (customFilters = {}) => {
       setLoading(true)
       setError(null)
       try {
-        const finalFilters = { ...sortConfig, ...customFilters }
+        const finalFilters = { ...filters, ...customFilters }
+        console.log("Fetching products with filters:", finalFilters)
         const result = await productsService.getProducts(finalFilters)
+
         if (result.success) {
+          console.log("Products loaded:", result.data.length)
           setProducts(result.data)
+          if (result.pagination) {
+            setPagination(result.pagination)
+          }
+          return { success: true, data: result.data }
         } else {
+          console.error("Error from productsService:", result.message)
           setError(result.message)
+          setProducts([])
           toast.error(result.message)
+          return { success: false, message: result.message }
         }
       } catch (error) {
+        console.error("Error in fetchProducts:", error)
         const message = "Error al cargar productos"
         setError(message)
+        setProducts([])
         toast.error(message)
+        return { success: false, message }
       } finally {
         setLoading(false)
       }
     },
-    [sortConfig],
+    [filters],
   )
+
+  const updateFilters = useCallback((newFilters) => {
+    setFilters((prev) => ({ ...prev, ...newFilters }))
+  }, [])
+
+  const handlePageChange = useCallback(
+    (page) => {
+      const newOffset = (page - 1) * filters.limit
+      updateFilters({ offset: newOffset })
+    },
+    [filters.limit, updateFilters],
+  )
+
+  useEffect(() => {
+    fetchProducts()
+  }, [filters, fetchProducts])
 
   const createProduct = async (productData) => {
     setLoading(true)
@@ -44,6 +93,8 @@ export const useProducts = (initialFilters = {}) => {
       const result = await productsService.createProduct(productData)
       if (result.success) {
         toast.success("Producto creado exitosamente")
+        // Refrescar productos después de crear
+        await fetchProducts({ offset: 0 })
         return { success: true, data: result.data }
       } else {
         toast.error(result.message)
@@ -64,6 +115,8 @@ export const useProducts = (initialFilters = {}) => {
       const result = await productsService.updateProduct(id, productData)
       if (result.success) {
         toast.success("Producto actualizado exitosamente")
+        // Refrescar productos después de actualizar
+        await fetchProducts({ offset: 0 })
         return { success: true, data: result.data }
       } else {
         toast.error(result.message)
@@ -84,6 +137,8 @@ export const useProducts = (initialFilters = {}) => {
       const result = await productsService.deleteProduct(id)
       if (result.success) {
         toast.success("Producto eliminado exitosamente")
+        // Refrescar productos después de eliminar
+        await fetchProducts({ offset: 0 })
         return { success: true }
       } else {
         toast.error(result.message)
@@ -117,21 +172,50 @@ export const useProducts = (initialFilters = {}) => {
     }
   }
 
-  const updateSorting = useCallback((sortBy, sortOrder) => {
-    setSortConfig({ sortBy, sortOrder })
-  }, [])
+  // Nueva función para búsqueda de productos
+  const searchProducts = async (searchFilters = {}) => {
+    try {
+      const result = await productsService.searchProducts(searchFilters)
+      if (result.success) {
+        return { success: true, data: result.data, searchTerm: result.searchTerm, totalResults: result.totalResults }
+      } else {
+        return { success: false, message: result.message, data: [] }
+      }
+    } catch (error) {
+      const message = "Error en la búsqueda de productos"
+      console.error("Search products error:", error)
+      return { success: false, message, data: [] }
+    }
+  }
+
+  // Mantener compatibilidad con funciones existentes
+  const updateSorting = useCallback(
+    (sortBy, sortOrder) => {
+      updateFilters({ sortBy, sortOrder, offset: 0 })
+    },
+    [updateFilters],
+  )
+
+  const resetSorting = useCallback(() => {
+    updateFilters({ sortBy: "nombre", sortOrder: "asc", offset: 0 })
+  }, [updateFilters])
 
   return {
     products,
     loading,
     error,
-    sortConfig,
+    pagination,
+    sortConfig, // Mantener compatibilidad
     fetchProducts,
     createProduct,
     updateProduct,
     deleteProduct,
     getProductByCode,
-    updateSorting,
+    searchProducts, // Nueva función
+    updateSorting, // Mantener compatibilidad
+    resetSorting, // Mantener compatibilidad
+    updateFilters,
+    handlePageChange,
     refetch: fetchProducts,
   }
 }

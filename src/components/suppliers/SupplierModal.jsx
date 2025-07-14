@@ -146,7 +146,6 @@ const SupplierModal = ({ isOpen, onClose, onSave, supplier = null, isEditing = f
                   type="text"
                   value={formData.cuit}
                   onChange={(e) => handleInputChange("cuit", e.target.value)}
-                  placeholder="Ej: 20-12345678-9"
                   className={`bg-slate-50 ${errors.cuit ? "border-red-500 focus:border-red-500" : "border-slate-800"}`}
 
                   disabled={loading}
@@ -170,7 +169,6 @@ const SupplierModal = ({ isOpen, onClose, onSave, supplier = null, isEditing = f
                   type="text"
                   value={formData.nombre}
                   onChange={(e) => handleInputChange("nombre", e.target.value)}
-                  placeholder="Ej: Distribuidora ABC"
                   className={`bg-slate-50 ${errors.nombre ? "border-red-500 focus:border-red-500" : "border-slate-800"}`}
                   disabled={loading}
                   maxLength={100}
@@ -193,7 +191,6 @@ const SupplierModal = ({ isOpen, onClose, onSave, supplier = null, isEditing = f
                   type="tel"
                   value={formData.telefono}
                   onChange={(e) => handleInputChange("telefono", e.target.value)}
-                  placeholder="Ej: +54 11 1234-5678"
                   className={`bg-slate-50 ${errors.telefono ? "border-red-500 focus:border-red-500" : "border-slate-800"}`}
                   disabled={loading}
                   maxLength={20}

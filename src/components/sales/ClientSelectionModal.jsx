@@ -1,205 +1,272 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Search, User, UserPlus, CreditCard, Phone, Mail, Building2 } from "lucide-react"
+import { Button } from "../ui/button"
+import { Input } from "../ui/input"
+import { Badge } from "../ui/badge"
+import { Search, User, UserPlus, Phone, Mail, Building2, CreditCard, X } from "lucide-react"
 import { useDebounce } from "../../hooks/useDebounce"
 
-const ClientSelectionModal = ({
-    isOpen,
-    onClose,
-    onClientSelect,
-    clientes = [],
-    loading = false,
-}) => {
-    const [searchTerm, setSearchTerm] = useState("")
-    const [filteredClients, setFilteredClients] = useState([])
-    const searchRef = useRef(null)
+const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, clientes = [], loading = false }) => {
+  const [searchTerm, setSearchTerm] = useState("")
+  const [filteredClients, setFilteredClients] = useState([])
+  const searchRef = useRef(null)
 
-    const debouncedSearchTerm = useDebounce(searchTerm, 300)
+  const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
-    // Filtrar clientes cuando cambia el término de búsqueda
-    useEffect(() => {
-        if (!debouncedSearchTerm) {
-            setFilteredClients([])
-            return
-        }
-
-        const normalizedSearch = debouncedSearchTerm
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-
-        const filtered = clientes.filter((cliente) => {
-            const normalizedName = cliente.nombre
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-            const normalizedPhone = cliente.telefono ? cliente.telefono.toLowerCase() : ""
-
-            return (
-                normalizedName.includes(normalizedSearch) ||
-                normalizedPhone.includes(normalizedSearch) ||
-                (cliente.email && cliente.email.toLowerCase().includes(normalizedSearch))
-            )
-        })
-
-        setFilteredClients(filtered)
-    }, [debouncedSearchTerm, clientes])
-
-    // Seleccionar cliente
-    const handleSelectClient = (cliente) => {
-        onClientSelect({
-            id: cliente.id,
-            nombre: cliente.nombre,
-            tipo: "cliente_registrado",
-            telefono: cliente.telefono,
-            email: cliente.email,
-            tiene_cuenta_corriente: cliente.tiene_cuenta_corriente || false,
-            saldo_cuenta_corriente: cliente.saldo_cuenta_corriente || 0,
-            limite_credito: cliente.limite_credito || null,
-        })
-        onClose()
+  // Filtrar clientes cuando cambia el término de búsqueda
+  useEffect(() => {
+    if (!debouncedSearchTerm) {
+      setFilteredClients([])
+      return
     }
 
-    // Seleccionar consumidor final
-    const handleSelectConsumidorFinal = () => {
-        onClientSelect({
-            id: 1,
-            nombre: "Consumidor Final",
-            tipo: "consumidor_final",
-            tiene_cuenta_corriente: false,
-        })
-        onClose()
-    }
+    const normalizedSearch = debouncedSearchTerm
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
 
-    // Formatear moneda
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat("es-AR", {
-            style: "currency",
-            currency: "ARS",
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        }).format(amount || 0)
-    }
+    const filtered = clientes.filter((cliente) => {
+      const normalizedName = cliente.nombre
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+      const normalizedPhone = cliente.telefono ? cliente.telefono.toLowerCase() : ""
+      const normalizedCuit = cliente.cuit ? cliente.cuit.toLowerCase() : ""
 
-    // Calcular saldo disponible
-    const calcularSaldoDisponible = (cliente) => {
-        if (!cliente.tiene_cuenta_corriente) return 0
-        if (cliente.limite_credito === null) return null
-        return Math.max(0, cliente.limite_credito - cliente.saldo_cuenta_corriente)
-    }
+      return (
+        normalizedName.includes(normalizedSearch) ||
+        normalizedPhone.includes(normalizedSearch) ||
+        normalizedCuit.includes(normalizedSearch) ||
+        (cliente.email && cliente.email.toLowerCase().includes(normalizedSearch))
+      )
+    })
 
-    return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center text-xl">
-                        <User className="w-5 h-5 mr-2 text-blue-600" />
-                        Seleccionar Cliente
-                    </DialogTitle>
-                </DialogHeader>
+    setFilteredClients(filtered)
+  }, [debouncedSearchTerm, clientes])
 
-                <div className="space-y-4">
-                    {/* Búsqueda */}
-                    <div className="relative" ref={searchRef}>
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                        <Input
-                            type="text"
-                            placeholder="Buscar cliente por nombre, teléfono o email..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10 border-gray-400 bg-slate-100"
-                            disabled={loading}
-                        />
-                    </div>
+  // Seleccionar cliente
+  const handleSelectClient = (cliente) => {
+    onClientSelect({
+      id: cliente.id,
+      nombre: cliente.nombre,
+      tipo: "cliente_registrado",
+      telefono: cliente.telefono,
+      email: cliente.email,
+      cuit: cliente.cuit,
+      direccion: cliente.direccion,
+      tiene_cuenta_corriente: cliente.tiene_cuenta_corriente || false,
+      saldo_cuenta_corriente: cliente.saldo_cuenta_corriente || 0,
+      limite_credito: cliente.limite_credito || null,
+    })
+    handleClose()
+  }
 
-                    {/* Botones rápidos */}
-                    <div className="flex gap-3">
-                        <Button
-                            onClick={handleSelectConsumidorFinal}
-                            className="flex-1 bg-slate-800 text-gray-100 hover:bg-slate-900 hover:text-white border border-slate-800"
-                            variant="outline"
-                        >
-                            <User className="h-4 w-4 mr-2" />
-                            Consumidor Final
-                        </Button>
-                        <Button variant="outline" className="bg-slate-800 text-gray-100 hover:bg-slate-900 hover:text-white border border-slate-800">
-                            <UserPlus className="h-4 w-4 mr-2" />
-                            Nuevo Cliente
-                        </Button>
-                    </div>
+  // Seleccionar consumidor final
+  const handleSelectConsumidorFinal = () => {
+    onClientSelect({
+      id: 1,
+      nombre: "Consumidor Final",
+      tipo: "consumidor_final",
+      tiene_cuenta_corriente: false,
+    })
+    handleClose()
+  }
 
-                    {/* Resultados de búsqueda */}
-                    <div className="max-h-96 overflow-y-auto border border-gray-400 bg-slate-100 rounded-lg">
-                        {loading ? (
-                            <div className="p-8 text-center text-gray-500">
-                                <div className="inline-block h-6 w-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin mr-2"></div>
-                                Buscando clientes...
-                            </div>
-                        ) : searchTerm && filteredClients.length > 0 ? (
-                            <div className="divide-y divide-gray-100">
-                                {filteredClients.map((cliente) => (
-                                    <div
-                                        key={cliente.id}
-                                        onClick={() => handleSelectClient(cliente)}
-                                        className="p-4 hover:bg-gray-50 cursor-pointer transition-colors"
-                                    >
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex-1">
-                                                <h4 className="font-semibold text-gray-900">{cliente.nombre}</h4>
-                                                <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
-                                                    {cliente.telefono && (
-                                                        <div className="flex items-center">
-                                                            <Phone className="w-3 h-3 mr-1" />
-                                                            {cliente.telefono}
-                                                        </div>
-                                                    )}
-                                                    {cliente.email && (
-                                                        <div className="flex items-center">
-                                                            <Mail className="w-3 h-3 mr-1" />
-                                                            {cliente.email}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                {cliente.tiene_cuenta_corriente ? (
-                                                    <div className="flex items-center mt-2">
-                                                        <Building2 className="w-3 h-3 mr-1 text-orange-600" />
-                                                        <span className="text-xs text-orange-700 font-medium">Cuenta Corriente</span>
-                                                        <Badge variant="outline" className="ml-2 text-xs">
-                                                            Disponible:{" "}
-                                                            {calcularSaldoDisponible(cliente) === null
-                                                                ? "Ilimitado"
-                                                                : formatCurrency(calcularSaldoDisponible(cliente))}
-                                                        </Badge>
-                                                    </div>
-                                                ) : null}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : searchTerm && filteredClients.length === 0 ? (
-                            <div className="p-8 text-center text-gray-500">
-                                <User className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                                <p>No se encontraron clientes</p>
-                                <p className="text-sm text-gray-400 mt-1">Intente con otros términos de búsqueda</p>
-                            </div>
-                        ) : (
-                            <div className="p-8 text-center text-gray-500">
-                                <Search className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                                <p>Busque un cliente para comenzar</p>
-                                <p className="text-sm text-gray-400 mt-1">O seleccione "Consumidor Final"</p>
-                            </div>
-                        )}
-                    </div>
+  // Formatear moneda
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("es-AR", {
+      style: "currency",
+      currency: "ARS",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount || 0)
+  }
+
+  // Calcular saldo disponible
+  const calcularSaldoDisponible = (cliente) => {
+    if (!cliente.tiene_cuenta_corriente) return 0
+    if (cliente.limite_credito === null) return null
+    return Math.max(0, cliente.limite_credito - cliente.saldo_cuenta_corriente)
+  }
+
+  const handleClose = () => {
+    setSearchTerm("")
+    setFilteredClients([])
+    onClose()
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[100] p-4">
+      <div className="bg-white shadow-xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden relative z-[101]">
+        {/* Header */}
+        <div className="flex-shrink-0 flex items-center justify-between p-6 bg-slate-800">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-slate-600 rounded-lg flex items-center justify-center">
+              <User className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-white">Seleccionar Cliente</h2>
+              <p className="text-sm text-slate-300 mt-1">Elija un cliente para la venta</p>
+            </div>
+          </div>
+          <Button
+            onClick={handleClose}
+            variant="ghost"
+            size="sm"
+            className="text-slate-300 hover:text-white hover:bg-slate-700"
+            disabled={loading}
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6" style={{ maxHeight: "calc(85vh - 140px)" }}>
+          <div className="space-y-6">
+            {/* Búsqueda */}
+            <div className="relative" ref={searchRef}>
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+              <Input
+                type="text"
+                placeholder="Buscar cliente por nombre, teléfono, CUIT o email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 border-slate-300 bg-slate-50 focus:border-slate-800 focus:ring-slate-800/20"
+                disabled={loading}
+                autoFocus
+              />
+            </div>
+
+            {/* Botones rápidos */}
+            <div className="flex gap-3">
+              <Button
+                onClick={handleSelectConsumidorFinal}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-white"
+                disabled={loading}
+              >
+                <User className="h-4 w-4 mr-2" />
+                Consumidor Final
+              </Button>
+              <Button
+                variant="outline"
+                className="bg-white hover:bg-slate-50 text-slate-700 border-slate-300"
+                disabled={loading}
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Nuevo Cliente
+              </Button>
+            </div>
+
+            {/* Resultados de búsqueda */}
+            <div className="border border-slate-200 bg-white rounded-lg shadow-sm min-h-[400px]">
+              {loading ? (
+                <div className="p-12 text-center text-slate-500">
+                  <div className="inline-block h-8 w-8 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin mb-4"></div>
+                  <p className="font-medium">Buscando clientes...</p>
                 </div>
-            </DialogContent>
-        </Dialog>
-    )
+              ) : searchTerm && filteredClients.length > 0 ? (
+                <div className="divide-y divide-slate-100">
+                  {filteredClients.map((cliente) => (
+                    <div
+                      key={cliente.id}
+                      className="p-6 hover:bg-slate-50 cursor-pointer transition-colors group"
+                      onClick={() => handleSelectClient(cliente)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <h4 className="font-semibold text-slate-900 text-lg group-hover:text-slate-800">
+                                {cliente.nombre}
+                              </h4>
+                              {cliente.cuit && (
+                                <div className="flex items-center mt-1 text-sm text-slate-600">
+                                  <CreditCard className="w-3 h-3 mr-1.5" />
+                                  CUIT: {cliente.cuit}
+                                </div>
+                              )}
+                            </div>
+                            <Button
+                              size="sm"
+                              className="bg-slate-800 hover:bg-slate-700 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              Seleccionar
+                            </Button>
+                          </div>
+
+                          {/* Información de contacto */}
+                          {(cliente.telefono || cliente.email) && (
+                            <div className="flex flex-wrap items-center gap-4 mb-3 text-sm text-slate-600">
+                              {cliente.telefono && (
+                                <div className="flex items-center">
+                                  <Phone className="w-3 h-3 mr-1.5" />
+                                  {cliente.telefono}
+                                </div>
+                              )}
+                              {cliente.email && (
+                                <div className="flex items-center">
+                                  <Mail className="w-3 h-3 mr-1.5" />
+                                  {cliente.email}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Dirección */}
+                          {cliente.direccion && (
+                            <div className="flex items-center mb-3 text-sm text-slate-600">
+                              <Building2 className="w-3 h-3 mr-1.5" />
+                              {cliente.direccion}
+                            </div>
+                          )}
+
+                          {/* Cuenta corriente */}
+                          {cliente.tiene_cuenta_corriente && (
+                            <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                              <div className="flex items-center">
+                                <CreditCard className="w-4 h-4 mr-2 text-blue-600" />
+                                <span className="text-sm font-medium text-blue-800">Cuenta Corriente Activa</span>
+                              </div>
+                              <Badge variant="outline" className="bg-white border-blue-300 text-blue-700">
+                                Disponible:{" "}
+                                {calcularSaldoDisponible(cliente) === null
+                                  ? "Ilimitado"
+                                  : formatCurrency(calcularSaldoDisponible(cliente))}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : searchTerm && filteredClients.length === 0 ? (
+                <div className="p-12 text-center text-slate-500">
+                  <User className="w-16 h-16 mx-auto mb-4 text-slate-300" />
+                  <h3 className="font-medium text-lg mb-2">No se encontraron clientes</h3>
+                  <p className="text-sm text-slate-400">
+                    Intente con otros términos de búsqueda o cree un nuevo cliente
+                  </p>
+                </div>
+              ) : (
+                <div className="p-12 text-center text-slate-500">
+                  <Search className="w-16 h-16 mx-auto mb-4 text-slate-300" />
+                  <h3 className="font-medium text-lg mb-2">Busque un cliente</h3>
+                  <p className="text-sm text-slate-400 mb-4">
+                    Use el campo de búsqueda para encontrar clientes registrados
+                  </p>
+                  <p className="text-xs text-slate-400">O seleccione "Consumidor Final" para una venta rápida</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default ClientSelectionModal

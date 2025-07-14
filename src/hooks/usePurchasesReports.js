@@ -1,153 +1,202 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback, useEffect } from "react"
+import { apiClient } from "../config/api"
 import toast from "react-hot-toast"
 
-export const usePurchasesReports = () => {
-  const [purchases, setPurchases] = useState([])
-  const [stats, setStats] = useState(null)
+export const usePurchasesReports = (initialFilters = {}) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [purchases, setPurchases] = useState([])
+  const [stats, setStats] = useState(null)
+  const [filters, setFilters] = useState({
+    fechaInicio: "",
+    fechaFin: "",
+    proveedor: "",
+    numeroCompra: "",
+    estado: "todos",
+    tipoPago: "todos",
+    limit: 10,
+    offset: 0,
+    ...initialFilters,
+  })
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10,
+  })
 
-  const fetchPurchases = async (filters = {}) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const queryParams = new URLSearchParams()
+  // Obtener compras con información de pagos y paginación
+  const fetchPurchases = useCallback(
+    async (customFilters = {}) => {
+      setLoading(true)
+      setError(null)
 
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value && value !== "todos") {
-          queryParams.append(key, value)
+      try {
+        const finalFilters = { ...filters, ...customFilters }
+        const params = new URLSearchParams()
+
+        Object.entries(finalFilters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== "" && value !== "todos") {
+            params.append(key, value)
+          }
+        })
+
+        const url = `/purchases/reports?${params}`
+        console.log("Fetching purchases from:", url) // DEBUG
+
+        const response = await apiClient.get(url)
+
+        if (response.data.success) {
+          // Procesar cada compra para obtener información de pagos
+          const purchasesWithPayments = response.data.data.map((purchase) => ({
+            ...purchase,
+            pagos: purchase.pagos || [],
+            detalles: purchase.detalles || [],
+          }))
+
+          setPurchases(purchasesWithPayments)
+          if (response.data.pagination) {
+            setPagination(response.data.pagination)
+          }
+          return { success: true, data: purchasesWithPayments }
+        } else {
+          setError(response.data.message || "Error al cargar compras")
+          setPurchases([])
+          return { success: false, message: response.data.message }
         }
-      })
-
-      const response = await fetch(`/api/purchases/reports?${queryParams}`)
-      const data = await response.json()
-
-      if (data.success) {
-        setPurchases(data.data || [])
-      } else {
-        setError(data.message || "Error al cargar compras")
+      } catch (error) {
+        console.error("Error fetching purchases:", error)
+        const errorMessage = error.response?.data?.message || "Error de conexión con el servidor"
+        setError(errorMessage)
         setPurchases([])
+        toast.error(errorMessage)
+        return { success: false, message: errorMessage }
+      } finally {
+        setLoading(false)
+      }
+    },
+    [filters],
+  )
+
+  const updateFilters = useCallback((newFilters) => {
+    setFilters((prev) => ({ ...prev, ...newFilters }))
+  }, [])
+
+  const handlePageChange = useCallback(
+    (page) => {
+      const newOffset = (page - 1) * filters.limit
+      updateFilters({ offset: newOffset })
+    },
+    [filters.limit, updateFilters],
+  )
+
+  useEffect(() => {
+    fetchPurchases()
+  }, [filters, fetchPurchases])
+
+  // Obtener estadísticas
+  const fetchStats = useCallback(
+    async (customFilters = {}) => {
+      try {
+        const finalFilters = { ...filters, ...customFilters }
+        const params = new URLSearchParams()
+
+        Object.entries(finalFilters).forEach(([key, value]) => {
+          if (value && value !== "todos") {
+            // Solo incluir fechas para estadísticas
+            if (key === "fechaInicio" || key === "fechaFin") {
+              params.append(key, value)
+            }
+          }
+        })
+
+        const url = `/purchases/stats?${params}`
+        console.log("Fetching stats from:", url) // DEBUG
+
+        const response = await apiClient.get(url)
+
+        if (response.data.success) {
+          setStats(response.data.data)
+          return { success: true, data: response.data.data }
+        } else {
+          console.error("Error fetching stats:", response.data.message)
+          return { success: false, message: response.data.message }
+        }
+      } catch (error) {
+        console.error("Error fetching stats:", error)
+        const errorMessage = error.response?.data?.message || "Error al obtener estadísticas"
+        toast.error(errorMessage)
+        return { success: false, message: errorMessage }
+      }
+    },
+    [filters],
+  )
+
+  const getPurchaseById = async (purchaseId) => {
+    setLoading(true)
+    try {
+      const response = await apiClient.get(`/purchases/${purchaseId}`)
+
+      if (response.data.success) {
+        return { success: true, data: response.data.data }
+      } else {
+        toast.error(response.data.message)
+        return { success: false, message: response.data.message }
       }
     } catch (error) {
-      console.error("Error fetching purchases:", error)
-      setError("Error de conexión")
-      setPurchases([])
+      console.error("Error fetching purchase details:", error)
+      const message = error.response?.data?.message || "Error al cargar detalles"
+      toast.error(message)
+      return { success: false, message }
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchStats = async (filters = {}) => {
-    try {
-      const queryParams = new URLSearchParams()
-
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value && value !== "todos") {
-          queryParams.append(key, value)
-        }
-      })
-
-      const response = await fetch(`/api/purchases/stats?${queryParams}`)
-      const data = await response.json()
-
-      if (data.success) {
-        setStats(data.data)
-      } else {
-        console.error("Error fetching stats:", data.message)
-      }
-    } catch (error) {
-      console.error("Error fetching stats:", error)
-    }
-  }
-
-  const getPurchaseById = async (purchaseId) => {
-    try {
-      const response = await fetch(`/api/purchases/${purchaseId}`)
-      const data = await response.json()
-      return data
-    } catch (error) {
-      console.error("Error fetching purchase details:", error)
-      return { success: false, message: "Error al cargar detalles" }
-    }
-  }
-
-  const updatePurchaseStatus = async (purchaseId, updateData) => {
-    try {
-      const response = await fetch(`/api/purchases/${purchaseId}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updateData),
-      })
-      const data = await response.json()
-
-      if (data.success) {
-        // Actualizar la lista de compras
-        setPurchases((prev) =>
-          prev.map((purchase) => (purchase.id === purchaseId ? { ...purchase, ...updateData } : purchase)),
-        )
-      }
-
-      return data
-    } catch (error) {
-      console.error("Error updating purchase status:", error)
-      return { success: false, message: "Error al actualizar estado" }
-    }
-  }
-
   const receivePurchaseItems = async (purchaseId, receiveData) => {
     try {
-      const response = await fetch(`/api/purchases/${purchaseId}/receive`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(receiveData),
-      })
-      const data = await response.json()
+      const response = await apiClient.post(`/purchases/${purchaseId}/receive`, receiveData)
 
-      if (data.success) {
+      if (response.data.success) {
         // Actualizar la lista de compras
         setPurchases((prev) =>
-          prev.map((purchase) => (purchase.id === purchaseId ? { ...purchase, estado: data.data.estado } : purchase)),
+          prev.map((purchase) =>
+            purchase.id === purchaseId ? { ...purchase, estado: response.data.data.estado } : purchase,
+          ),
         )
+        toast.success("Productos recibidos exitosamente")
+        // Refrescar datos después de recibir productos
+        await fetchPurchases({ offset: 0 })
       }
 
-      return data
+      return response.data
     } catch (error) {
       console.error("Error receiving purchase items:", error)
-      return { success: false, message: "Error al recibir productos" }
+      const message = error.response?.data?.message || "Error al recibir productos"
+      toast.error(message)
+      return { success: false, message }
     }
   }
 
-  const exportPurchases = async (filters = {}) => {
+  const exportPurchases = async (customFilters = {}) => {
     try {
-      const queryParams = new URLSearchParams()
+      const finalFilters = { ...filters, ...customFilters }
+      const params = new URLSearchParams()
 
-      Object.entries(filters).forEach(([key, value]) => {
+      Object.entries(finalFilters).forEach(([key, value]) => {
         if (value && value !== "todos") {
-          queryParams.append(key, value)
+          params.append(key, value)
         }
       })
 
-      const response = await fetch(`/api/purchases/export?${queryParams}`)
+      const response = await apiClient.get(`/purchases/export?${params}`)
 
-      if (response.ok) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = `compras_${new Date().toISOString().split("T")[0]}.xlsx`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-        toast.success("Reporte exportado exitosamente")
+      if (response.data.success) {
+        toast.success(response.data.message || "Función de exportación en desarrollo")
       } else {
-        toast.error("Error al exportar reporte")
+        toast.error(response.data.message || "Error al exportar reporte")
       }
     } catch (error) {
       console.error("Error exporting purchases:", error)
@@ -160,11 +209,14 @@ export const usePurchasesReports = () => {
     stats,
     loading,
     error,
+    pagination,
     fetchPurchases,
     fetchStats,
     getPurchaseById,
-    updatePurchaseStatus,
     receivePurchaseItems,
     exportPurchases,
+    updateFilters,
+    handlePageChange,
+    refetch: fetchPurchases,
   }
 }

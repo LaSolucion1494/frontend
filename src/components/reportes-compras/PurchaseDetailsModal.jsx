@@ -1,442 +1,389 @@
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  X,
   FileText,
   Building,
-  CreditCard,
-  ShoppingCart,
   Package,
-  Phone,
-  Mail,
-  MapPin,
+  CreditCard,
   DollarSign,
-  Banknote,
-  Smartphone,
-  Receipt,
-  AlertCircle,
-  CheckCircle2,
-  Info,
+  X,
+  CheckCircle,
   Clock,
   AlertTriangle,
   XCircle,
-  Truck,
+  Banknote,
+  Smartphone,
 } from "lucide-react"
-import { formatCurrency } from "../../lib/utils"
-import { extractExactDateTime } from "../../lib/date-utils"
+import { formatCurrency } from "@/lib/utils" // Assuming formatCurrency is in lib/utils
+import ReceiveProductsModal from "./ReceiveProductsModal" // Assuming these are in the same components folder
 
-const PurchaseDetailsModal = ({ isOpen, onClose, purchase, onStatusChange }) => {
-  if (!purchase) return null
+export default function PurchaseDetailsModal({ isOpen, onClose, purchase, onReceive }) {
+  const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false)
 
-  // Función para formatear tipos de pago
-  const formatPaymentType = (type) => {
-    const types = {
-      efectivo: { label: "Efectivo", icon: Banknote, color: "text-green-600" },
-      tarjeta_credito: { label: "Tarjeta Crédito", icon: CreditCard, color: "text-blue-600" },
-      tarjeta_debito: { label: "Tarjeta Débito", icon: CreditCard, color: "text-indigo-600" },
-      transferencia: { label: "Transferencia", icon: Smartphone, color: "text-purple-600" },
-      otro: { label: "Otro", icon: DollarSign, color: "text-gray-600" },
-    }
-    return types[type] || { label: type, icon: DollarSign, color: "text-gray-600" }
+  if (!isOpen || !purchase) return null
+
+  // Configuración de estados
+  const statusConfig = {
+    pendiente: {
+      label: "Pendiente",
+      icon: Clock,
+      color: "text-yellow-600",
+      bg: "bg-yellow-100",
+      border: "border-yellow-200",
+    },
+    parcial: {
+      label: "Parcial",
+      icon: AlertTriangle,
+      color: "text-orange-600",
+      bg: "bg-orange-100",
+      border: "border-orange-200",
+    },
+    recibida: {
+      label: "Recibida",
+      icon: CheckCircle,
+      color: "text-green-600",
+      bg: "bg-green-100",
+      border: "border-green-200",
+    },
+    cancelada: {
+      label: "Cancelada",
+      icon: XCircle,
+      color: "text-red-600",
+      bg: "bg-red-100",
+      border: "border-red-200",
+    },
   }
 
-  // Función para obtener el estado de la compra
-  const getEstadoCompra = (estado) => {
-    switch (estado) {
-      case "recibida":
-        return {
-          label: "Recibida",
-          icon: CheckCircle2,
-          color: "bg-green-100 text-green-800 border-green-200",
-        }
-      case "pendiente":
-        return {
-          label: "Pendiente",
-          icon: Clock,
-          color: "bg-yellow-100 text-yellow-800 border-yellow-200",
-        }
-      case "parcial":
-        return {
-          label: "Parcial",
-          icon: AlertTriangle,
-          color: "bg-orange-100 text-orange-800 border-orange-200",
-        }
-      case "cancelada":
-        return {
-          label: "Cancelada",
-          icon: XCircle,
-          color: "bg-red-100 text-red-800 border-red-200",
-        }
-      default:
-        return {
-          label: estado,
-          icon: AlertCircle,
-          color: "bg-gray-100 text-gray-800 border-gray-200",
-        }
-    }
+  // Configuración de métodos de pago
+  const paymentConfig = {
+    efectivo: {
+      label: "Efectivo",
+      icon: Banknote,
+      color: "text-green-600",
+      bg: "bg-green-100",
+    },
+    transferencia: {
+      label: "Transferencia",
+      icon: Smartphone,
+      color: "text-purple-600",
+      bg: "bg-purple-100",
+    },
+    tarjeta_credito: {
+      label: "Tarjeta Crédito",
+      icon: CreditCard,
+      color: "text-blue-600",
+      bg: "bg-blue-100",
+    },
+    tarjeta_debito: {
+      label: "Tarjeta Débito",
+      icon: CreditCard,
+      color: "text-cyan-600",
+      bg: "bg-cyan-100",
+    },
+    otro: {
+      label: "Otro",
+      icon: DollarSign,
+      color: "text-gray-600",
+      bg: "bg-gray-100",
+    },
   }
 
-  const estadoCompra = getEstadoCompra(purchase.estado)
-  const EstadoIcon = estadoCompra.icon
-  const dateTime = extractExactDateTime(purchase.fecha_creacion)
+  const currentStatus = statusConfig[purchase.estado] || statusConfig.pendiente
+  const StatusIcon = currentStatus.icon
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="flex-shrink-0 pb-4 border-b border-slate-200">
-          <DialogTitle className="flex items-center space-x-3">
-            <div className="p-2 bg-slate-800 rounded-lg">
-              <FileText className="w-5 h-5 text-white" />
+    <>
+      {/* Overlay */}
+      <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[100] p-4">
+        {/* Modal Container */}
+        <div className="bg-white shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden relative z-[101]">
+          {/* Header */}
+          <div className="flex-shrink-0 flex items-center justify-between p-4 border-b bg-slate-800 text-white">
+            {" "}
+            {/* Added bg-slate-800 and text-white */}
+            <div className="flex items-center space-x-3">
+              <FileText className="h-6 w-6 text-blue-300" /> {/* Adjusted icon color for contrast */}
+              <span className="text-xl font-semibold">Detalles de Compra - {purchase.numero_compra}</span>
             </div>
-            <div>
-              <span className="text-xl font-bold">Detalles de Compra</span>
-              <p className="text-sm text-slate-600 font-normal mt-1">Número: {purchase.numero_compra}</p>
-            </div>
-          </DialogTitle>
-        </DialogHeader>
+            <Badge variant="secondary" className={`${currentStatus.bg} ${currentStatus.border}`}>
+              <StatusIcon className={`h-4 w-4 mr-2 ${currentStatus.color}`} />
+              <span className={currentStatus.color}>{currentStatus.label}</span>
+            </Badge>
+          </div>
 
-        <div className="flex-1 overflow-y-auto min-h-0 py-4">
-          <div className="space-y-6">
-            {/* Información principal */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Información de la compra */}
-              <Card className="border-slate-200">
-                <CardHeader className="pb-3 bg-slate-50 rounded-t-lg">
-                  <CardTitle className="text-base flex items-center">
-                    <Receipt className="w-4 h-4 mr-2 text-slate-600" />
-                    Información de la Compra
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-600 text-sm">Número:</span>
-                    <span className="font-mono font-semibold text-slate-900">{purchase.numero_compra}</span>
-                  </div>
-
-                  <div className="flex justify-between items-start">
-                    <span className="text-slate-600 text-sm">Fecha:</span>
-                    <div className="text-right">
-                      <div className="font-medium text-slate-900">{dateTime.date}</div>
-                      <div className="text-xs text-slate-500">{dateTime.time}</div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-600 text-sm">Estado:</span>
-                    <Badge className={`${estadoCompra.color} border font-medium`}>
-                      <EstadoIcon className="w-3 h-3 mr-1" />
-                      {estadoCompra.label}
-                    </Badge>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-600 text-sm">Usuario:</span>
-                    <span className="font-medium text-slate-900">{purchase.usuario_nombre}</span>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-600 text-sm">ID Compra:</span>
-                    <span className="font-mono text-sm text-slate-700">#{purchase.id}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Información del proveedor */}
-              <Card className="border-slate-200">
-                <CardHeader className="pb-3 bg-slate-50 rounded-t-lg">
-                  <CardTitle className="text-base flex items-center">
-                    <Building className="w-4 h-4 mr-2 text-slate-600" />
-                    Proveedor
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 p-4">
-                  <div>
-                    <span className="text-slate-600 text-sm">Nombre:</span>
-                    <p className="font-medium text-slate-900 mt-1">
-                      {purchase.proveedor_nombre || "Proveedor no especificado"}
-                    </p>
-                  </div>
-
-                  {purchase.proveedor_telefono && (
-                    <div className="flex items-center space-x-2">
-                      <Phone className="w-4 h-4 text-slate-400" />
-                      <span className="text-sm text-slate-600">{purchase.proveedor_telefono}</span>
-                    </div>
-                  )}
-
-                  {purchase.proveedor_email && (
-                    <div className="flex items-center space-x-2">
-                      <Mail className="w-4 h-4 text-slate-400" />
-                      <span className="text-sm text-slate-600">{purchase.proveedor_email}</span>
-                    </div>
-                  )}
-
-                  {purchase.proveedor_direccion && (
-                    <div className="flex items-start space-x-2">
-                      <MapPin className="w-4 h-4 text-slate-400 mt-0.5" />
-                      <span className="text-sm text-slate-600">{purchase.proveedor_direccion}</span>
-                    </div>
-                  )}
-
-                  {purchase.proveedor_cuit && (
-                    <div>
-                      <span className="text-slate-600 text-sm">CUIT:</span>
-                      <p className="font-mono text-sm text-slate-700 mt-1">{purchase.proveedor_cuit}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Resumen financiero */}
-              <Card className="border-slate-200">
-                <CardHeader className="pb-3 bg-slate-50 rounded-t-lg">
-                  <CardTitle className="text-base flex items-center">
-                    <DollarSign className="w-4 h-4 mr-2 text-slate-600" />
-                    Resumen Financiero
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 p-4">
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 text-sm">Subtotal:</span>
-                    <span className="font-medium text-slate-900">{formatCurrency(Number(purchase.subtotal) || 0)}</span>
-                  </div>
-
-                  {Number(purchase.descuento) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-600 text-sm">Descuento:</span>
-                      <span className="font-medium text-red-600">-{formatCurrency(Number(purchase.descuento))}</span>
-                    </div>
-                  )}
-
-                  {Number(purchase.interes) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-600 text-sm">Interés:</span>
-                      <span className="font-medium text-orange-600">+{formatCurrency(Number(purchase.interes))}</span>
-                    </div>
-                  )}
-
-                  <Separator className="my-3" />
-
-                  <div className="flex justify-between text-lg font-semibold">
-                    <span className="text-slate-700">Total:</span>
-                    <span className="text-green-600">{formatCurrency(Number(purchase.total) || 0)}</span>
-                  </div>
-
-                  {(purchase.estado === "pendiente" || purchase.estado === "parcial") && onStatusChange && (
-                    <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Truck className="w-4 h-4 text-orange-600" />
-                          <span className="text-sm font-medium text-orange-800">Gestión de Estado</span>
+          {/* Tabs and Scrollable Content Area */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <Tabs defaultValue="general" className="w-full h-full flex flex-col">
+              {" "}
+              {/* Added h-full and flex flex-col */}
+              <TabsList className="grid w-full grid-cols-3 flex-shrink-0">
+                <TabsTrigger value="general">General</TabsTrigger>
+                <TabsTrigger value="productos">Productos</TabsTrigger>
+                <TabsTrigger value="pagos">Pagos</TabsTrigger>
+              </TabsList>
+              {/* Scrollable Content for Tabs */}
+              {/* Added max-h-[calc(90vh-160px)] to ensure scrollability */}
+              <div className="flex-1 overflow-y-auto p-6 max-h-[calc(90vh-160px)]">
+                {/* Tab General */}
+                <TabsContent value="general" className="space-y-6 mt-0">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Información de la compra */}
+                    <Card className="border border-slate-800">
+                      {" "}
+                      {/* Added border */}
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2">
+                          <FileText className="h-5 w-5" />
+                          <span>Información de la Compra</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Número:</span>
+                          <span className="font-mono font-medium">{purchase.numero_compra}</span>
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={() => onStatusChange(purchase.id)}
-                          className="bg-orange-600 hover:bg-orange-700 text-white"
-                        >
-                          Cambiar Estado
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Fecha:</span>
+                          <span>{new Date(purchase.fecha_compra).toLocaleDateString("es-AR")}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Estado:</span>
+                          <Badge variant="secondary" className={`${currentStatus.bg}`}>
+                            <StatusIcon className={`h-3 w-3 mr-1 ${currentStatus.color}`} />
+                            <span className={currentStatus.color}>{currentStatus.label}</span>
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Usuario:</span>
+                          <span>{purchase.usuario_nombre}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
 
-            {/* Productos comprados */}
-            <Card className="border-slate-200">
-              <CardHeader className="pb-3 bg-slate-50 rounded-t-lg">
-                <CardTitle className="text-base flex items-center justify-between">
-                  <div className="flex items-center">
-                    <ShoppingCart className="w-4 h-4 mr-2 text-slate-600" />
-                    Productos Comprados
+                    {/* Información del proveedor */}
+                    <Card className="border border-slate-800">
+                      {" "}
+                      {/* Added border */}
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2">
+                          <Building className="h-5 w-5" />
+                          <span>Proveedor</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Nombre:</span>
+                          <span className="font-medium">{purchase.proveedor_nombre}</span>
+                        </div>
+                        {purchase.proveedor_cuit && (
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">CUIT:</span>
+                            <span>{purchase.proveedor_cuit}</span>
+                          </div>
+                        )}
+                        {purchase.proveedor_telefono && (
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Teléfono:</span>
+                            <span>{purchase.proveedor_telefono}</span>
+                          </div>
+                        )}
+                        {purchase.proveedor_direccion && (
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Dirección:</span>
+                            <span className="text-right">{purchase.proveedor_direccion}</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   </div>
-                  <Badge variant="secondary" className="bg-slate-200 text-slate-700">
-                    {purchase.detalles?.length || 0} items
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {purchase.detalles && purchase.detalles.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-slate-100 border-b border-slate-200">
-                        <tr>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">Producto</th>
-                          <th className="text-center py-3 px-4 text-sm font-medium text-slate-600">Cantidad</th>
-                          <th className="text-center py-3 px-4 text-sm font-medium text-slate-600">Recibida</th>
-                          <th className="text-right py-3 px-4 text-sm font-medium text-slate-600">Precio Unit.</th>
-                          <th className="text-right py-3 px-4 text-sm font-medium text-slate-600">Subtotal</th>
-                          <th className="text-center py-3 px-4 text-sm font-medium text-slate-600">Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {purchase.detalles.map((item, index) => (
-                          <tr key={index} className="hover:bg-slate-50">
-                            <td className="py-4 px-4">
+
+                  {/* Totales */}
+                  <Card className="border border-slate-800 mx-auto max-w-sm">
+                    {" "}
+                    {/* Added border, mx-auto, and max-w-sm */}
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2 justify-center">
+                        {" "}
+                        {/* Centered title */}
+                        <DollarSign className="h-5 w-5" />
+                        <span>Total</span> {/* Changed title to "Total" */}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-center">
+                        {" "}
+                        {/* Centered content */}
+                        <p className="text-3xl font-bold text-green-600">{formatCurrency(purchase.total)}</p>{" "}
+                        {/* Only total */}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Observaciones */}
+                  {purchase.observaciones && (
+                    <Card className="border border-slate-800">
+                      {" "}
+                      {/* Added border */}
+                      <CardHeader>
+                        <CardTitle>Observaciones</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-gray-700">{purchase.observaciones}</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+
+                {/* Tab Productos */}
+                <TabsContent value="productos" className="mt-0">
+                  <Card className="border border-slate-800">
+                    {" "}
+                    {/* Added border */}
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <Package className="h-5 w-5" />
+                        <span>Productos ({purchase.detalles?.length || 0})</span>
+                      </CardTitle>
+                      <CardDescription>Detalle de productos incluidos en la compra</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Producto</TableHead>
+                              <TableHead className="text-center">Cantidad</TableHead>
+                              <TableHead className="text-center">Recibida</TableHead>
+                              <TableHead className="text-center">Pendiente</TableHead>
+                              <TableHead className="text-right">Precio Unit.</TableHead>
+                              <TableHead className="text-right">Subtotal</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {purchase.detalles?.map((detalle) => {
+                              const pendiente = detalle.cantidad - detalle.cantidad_recibida
+                              return (
+                                <TableRow key={detalle.id}>
+                                  <TableCell>
+                                    <div>
+                                      <div className="font-medium">{detalle.producto_nombre}</div>
+                                      <div className="text-sm text-gray-500">
+                                        {detalle.producto_codigo} • {detalle.producto_marca || "Sin marca"}
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <Badge variant="outline">{detalle.cantidad}</Badge>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        detalle.cantidad_recibida === detalle.cantidad
+                                          ? "bg-green-100 text-green-700 border-green-200"
+                                          : detalle.cantidad_recibida > 0
+                                            ? "bg-yellow-100 text-yellow-700 border-yellow-200"
+                                            : "bg-gray-100 text-gray-700 border-gray-200"
+                                      }
+                                    >
+                                      {detalle.cantidad_recibida}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        pendiente === 0
+                                          ? "bg-green-100 text-green-700 border-green-200"
+                                          : "bg-red-100 text-red-700 border-red-200"
+                                      }
+                                    >
+                                      {pendiente}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    {formatCurrency(detalle.precio_unitario)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-medium">
+                                    {formatCurrency(detalle.subtotal)}
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* Tab Pagos */}
+                <TabsContent value="pagos" className="mt-0">
+                  <Card className="border border-slate-800">
+                    {" "}
+                    {/* Added border */}
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <CreditCard className="h-5 w-5" />
+                        <span>Métodos de Pago ({purchase.pagos?.length || 0})</span>
+                      </CardTitle>
+                      <CardDescription>Detalle de los métodos de pago utilizados</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {purchase.pagos?.map((pago, index) => {
+                          const config = paymentConfig[pago.tipo_pago] || paymentConfig.otro
+                          const PaymentIcon = config.icon
+                          return (
+                            <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
                               <div className="flex items-center space-x-3">
-                                <div className="p-2 bg-blue-100 rounded-lg">
-                                  <Package className="w-4 h-4 text-blue-600" />
+                                <div className={`p-2 rounded-lg ${config.bg}`}>
+                                  <PaymentIcon className={`h-4 w-4 ${config.color}`} />
                                 </div>
                                 <div>
-                                  <p className="font-medium text-slate-900">{item.producto_nombre}</p>
-                                  {item.producto_codigo && (
-                                    <p className="text-sm text-slate-500 font-mono">{item.producto_codigo}</p>
-                                  )}
+                                  <p className="font-medium">{config.label}</p>
+                                  {pago.descripcion && <p className="text-sm text-gray-500">{pago.descripcion}</p>}
                                 </div>
                               </div>
-                            </td>
-                            <td className="py-4 px-4 text-center">
-                              <Badge variant="secondary" className="bg-slate-200 text-slate-700">
-                                {item.cantidad}
-                              </Badge>
-                            </td>
-                            <td className="py-4 px-4 text-center">
-                              <Badge
-                                variant="secondary"
-                                className={
-                                  item.cantidad_recibida === item.cantidad
-                                    ? "bg-green-100 text-green-800"
-                                    : item.cantidad_recibida > 0
-                                      ? "bg-orange-100 text-orange-800"
-                                      : "bg-red-100 text-red-800"
-                                }
-                              >
-                                {item.cantidad_recibida || 0}
-                              </Badge>
-                            </td>
-                            <td className="py-4 px-4 text-right font-medium text-slate-900">
-                              {formatCurrency(Number(item.precio_unitario) || 0)}
-                            </td>
-                            <td className="py-4 px-4 text-right font-semibold text-green-600">
-                              {formatCurrency(Number(item.subtotal) || 0)}
-                            </td>
-                            <td className="py-4 px-4 text-center">
-                              {item.cantidad_recibida === 0 ? (
-                                <Badge className="bg-red-100 text-red-800 border-red-200">
-                                  <Clock className="w-3 h-3 mr-1" />
-                                  Pendiente
-                                </Badge>
-                              ) : item.cantidad_recibida === item.cantidad ? (
-                                <Badge className="bg-green-100 text-green-800 border-green-200">
-                                  <CheckCircle2 className="w-3 h-3 mr-1" />
-                                  Completo
-                                </Badge>
-                              ) : (
-                                <Badge className="bg-orange-100 text-orange-800 border-orange-200">
-                                  <AlertTriangle className="w-3 h-3 mr-1" />
-                                  Parcial
-                                </Badge>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Package className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                    <p className="text-slate-500">No hay productos en esta compra</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Información de pago */}
-            <Card className="border-slate-200">
-              <CardHeader className="pb-3 bg-slate-50 rounded-t-lg">
-                <CardTitle className="text-base flex items-center justify-between">
-                  <div className="flex items-center">
-                    <CreditCard className="w-4 h-4 mr-2 text-slate-600" />
-                    Métodos de Pago
-                  </div>
-                  <Badge variant="secondary" className="bg-slate-200 text-slate-700">
-                    {purchase.pagos?.length || 0} método{purchase.pagos?.length !== 1 ? "s" : ""}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                {purchase.pagos && purchase.pagos.length > 0 ? (
-                  <div className="space-y-3">
-                    {purchase.pagos.map((pago, index) => {
-                      const paymentType = formatPaymentType(pago.tipo_pago || pago.tipo)
-                      const PaymentIcon = paymentType.icon
-
-                      return (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div className={`p-2 rounded-lg bg-white border border-slate-200`}>
-                              <PaymentIcon className={`w-4 h-4 ${paymentType.color}`} />
+                              <div className="text-right">
+                                <p className="font-semibold">{formatCurrency(pago.monto)}</p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(pago.fecha_creacion).toLocaleDateString("es-AR")}
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-medium text-slate-900">{paymentType.label}</p>
-                              {pago.descripcion && <p className="text-sm text-slate-600">{pago.descripcion}</p>}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <span className="font-semibold text-lg text-slate-900">
-                              {formatCurrency(Number(pago.monto))}
-                            </span>
-                          </div>
-                        </div>
-                      )
-                    })}
-
-                    {/* Total de pagos */}
-                    <div className="border-t border-slate-200 pt-3 mt-4">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium text-slate-700">Total Pagado:</span>
-                        <span className="font-bold text-lg text-green-600">
-                          {formatCurrency(purchase.pagos.reduce((sum, pago) => sum + Number(pago.monto), 0))}
-                        </span>
+                          )
+                        })}
                       </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <CreditCard className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                    <p className="text-slate-500">No hay información de pagos</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </div>
+            </Tabs>
+          </div>
 
-            {/* Observaciones */}
-            {purchase.observaciones && (
-              <Card className="border-slate-200">
-                <CardHeader className="pb-3 bg-slate-50 rounded-t-lg">
-                  <CardTitle className="text-base flex items-center">
-                    <Info className="w-4 h-4 mr-2 text-slate-600" />
-                    Observaciones
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4">
-                  <p className="text-slate-700 whitespace-pre-wrap">{purchase.observaciones}</p>
-                </CardContent>
-              </Card>
-            )}
+          {/* Footer */}
+          <div className="flex-shrink-0 flex justify-end space-x-3 p-4 border-t">
+            <Button variant="outline" onClick={onClose} className="border-slate-800">
+              <X className="h-4 w-4 mr-2" />
+              Cerrar
+            </Button>
           </div>
         </div>
+      </div>
 
-        {/* Footer */}
-        <div className="flex-shrink-0 flex justify-end pt-4 border-t border-slate-200">
-          <Button onClick={onClose} className="bg-slate-800 hover:bg-slate-700 text-white">
-            <X className="w-4 h-4 mr-2" />
-            Cerrar
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+      <ReceiveProductsModal
+        isOpen={isReceiveModalOpen}
+        onClose={() => setIsReceiveModalOpen(false)}
+        purchase={purchase}
+        onReceive={onReceive}
+      />
+    </>
   )
 }
-
-export default PurchaseDetailsModal

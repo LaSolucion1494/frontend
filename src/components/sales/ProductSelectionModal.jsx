@@ -1,20 +1,22 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Search, Package, Plus, AlertTriangle, Barcode, Tag } from "lucide-react"
+import { Search, Package, Plus, Barcode, Tag, X, AlertTriangle } from "lucide-react"
 import { useDebounce } from "../../hooks/useDebounce"
+import SalesQuantityModal from "./SalesQuantityModal"
 
 const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, products = [], loading = false }) => {
   const [searchTerm, setSearchTerm] = useState("")
   const [filteredProducts, setFilteredProducts] = useState([])
+  const [showQuantityModal, setShowQuantityModal] = useState(false)
+  const [selectedProductForQuantity, setSelectedProductForQuantity] = useState(null)
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
-  // Filtrar productos cuando cambia el término de búsqueda o categoría
+  // Filtrar productos cuando cambia el término de búsqueda
   useEffect(() => {
     let filtered = products.filter((product) => product.activo !== false)
 
@@ -69,13 +71,32 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, products = []
       if (
         window.confirm(`El producto "${product.nombre}" no tiene stock disponible. ¿Desea agregarlo de todas formas?`)
       ) {
-        onProductSelect(product)
-        onClose()
+        setSelectedProductForQuantity(product)
+        setShowQuantityModal(true)
       }
     } else {
-      onProductSelect(product)
-      onClose()
+      setSelectedProductForQuantity(product)
+      setShowQuantityModal(true)
     }
+  }
+
+  const handleQuantityConfirm = (product, quantity) => {
+    onProductSelect(product, quantity)
+    setShowQuantityModal(false)
+    setSelectedProductForQuantity(null)
+    onClose()
+  }
+
+  const handleQuantityModalClose = () => {
+    setShowQuantityModal(false)
+    setSelectedProductForQuantity(null)
+  }
+
+  // Limpiar estado al cerrar
+  const handleClose = () => {
+    setSearchTerm("")
+    setFilteredProducts([])
+    onClose()
   }
 
   // Formatear moneda
@@ -88,142 +109,213 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, products = []
     }).format(amount || 0)
   }
 
-  // Obtener estado del stock
+  // Obtener estado del stock para ventas
   const getStockStatus = (product) => {
+    const stockMinimo = product.stock_minimo || 5
+
     if (product.stock <= 0) {
-      return { status: "sin-stock", color: "bg-red-100 text-red-800", text: "Sin stock" }
-    } else if (product.stock <= product.stock_minimo) {
-      return { status: "stock-bajo", color: "bg-yellow-100 text-yellow-800", text: "Stock bajo" }
+      return {
+        status: "sin-stock",
+        color: "bg-red-100 text-red-800 border-red-200",
+        text: "Sin stock",
+        icon: AlertTriangle,
+      }
+    } else if (product.stock <= stockMinimo) {
+      return {
+        status: "stock-bajo",
+        color: "bg-orange-100 text-orange-800 border-orange-200",
+        text: "Stock bajo",
+        icon: Package,
+      }
     } else {
-      return { status: "stock-ok", color: "bg-green-100 text-green-800", text: "Disponible" }
+      return {
+        status: "disponible",
+        color: "bg-green-100 text-green-800 border-green-200",
+        text: "Disponible",
+        icon: Package,
+      }
     }
   }
 
+  if (!isOpen) return null
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
-        <DialogHeader>
-          <DialogTitle className="flex items-center text-xl">
-            <Package className="w-5 h-5 mr-2 text-green-600" />
-            Seleccionar Producto
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          {/* Búsqueda */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              type="text"
-              placeholder="Buscar por nombre, código o marca..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 border-gray-400 bg-slate-100 focus:border-transparent"
-              disabled={loading}
-            />
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[100] p-4">
+      <div className="bg-white shadow-xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden relative z-[101]">
+        {/* Header */}
+        <div className="flex-shrink-0 flex items-center justify-between p-4 bg-slate-800">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-slate-600 rounded-lg flex items-center justify-center">
+              <Package className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-white">Seleccionar Productos</h2>
+              <p className="text-sm text-slate-300 mt-1">Agregue productos al carrito de ventas</p>
+            </div>
           </div>
+          <Button
+            onClick={handleClose}
+            variant="ghost"
+            size="sm"
+            className="text-slate-300 hover:text-white hover:bg-slate-700"
+            disabled={loading}
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
 
-          {/* Resultados de búsqueda */}
-          <div className="max-h-96 overflow-y-auto border border-gray-400 bg-slate-100 rounded-lg">
-            {loading ? (
-              <div className="p-8 text-center text-gray-500">
-                <div className="inline-block h-6 w-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin mr-2"></div>
-                Buscando productos...
-              </div>
-            ) : searchTerm && filteredProducts.length > 0 ? (
-              <div className="divide-y divide-gray-100">
-                {filteredProducts.map((product) => {
-                  const stockStatus = getStockStatus(product)
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6" style={{ maxHeight: "calc(90vh - 120px)" }}>
+          <div className="space-y-6">
+            {/* Búsqueda */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+              <Input
+                type="text"
+                placeholder="Buscar por nombre, código o marca..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 border-slate-300 bg-slate-50 focus:border-slate-800 focus:ring-slate-800/20"
+                disabled={loading}
+                autoFocus
+              />
+            </div>
 
-                  return (
-                    <div key={product.id} className="p-4 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <h4 className="font-medium text-gray-900 leading-tight">{product.nombre}</h4>
-                              <div className="flex items-center space-x-3 mt-1 text-sm text-gray-500">
-                                {product.codigo && (
-                                  <div className="flex items-center">
-                                    <Barcode className="h-3 w-3 mr-1" />
-                                    {product.codigo}
-                                  </div>
-                                )}
-                                {product.marca && (
-                                  <div className="flex items-center">
-                                    <Tag className="h-3 w-3 mr-1" />
-                                    {product.marca}
+            {/* Resultados de búsqueda */}
+            <div className="border border-slate-200 bg-white rounded-lg shadow-sm">
+              {loading ? (
+                <div className="p-12 text-center text-slate-500">
+                  <div className="inline-block h-8 w-8 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin mb-4"></div>
+                  <p className="font-medium">Buscando productos...</p>
+                </div>
+              ) : searchTerm && filteredProducts.length > 0 ? (
+                <div className="divide-y divide-slate-100">
+                  {filteredProducts.map((product) => {
+                    const stockStatus = getStockStatus(product)
+                    const precioVenta = product.precio_venta || 0
+                    const StatusIcon = stockStatus.icon
+                    const stockMinimo = product.stock_minimo || 5
+
+                    return (
+                      <div key={product.id} className="p-5 hover:bg-slate-50 transition-colors">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <h4 className="font-medium text-slate-900 leading-tight text-lg mb-2">
+                                  {product.nombre}
+                                </h4>
+                                <div className="flex items-center space-x-4 text-sm text-slate-500">
+                                  {product.codigo && (
+                                    <div className="flex items-center">
+                                      <Barcode className="h-3 w-3 mr-1" />
+                                      <span className="font-mono">{product.codigo}</span>
+                                    </div>
+                                  )}
+                                  {product.marca && (
+                                    <div className="flex items-center">
+                                      <Tag className="h-3 w-3 mr-1" />
+                                      <span>{product.marca}</span>
+                                    </div>
+                                  )}
+                                  {product.categoria_nombre && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs bg-slate-50 text-slate-600 border-slate-300"
+                                    >
+                                      {product.categoria_nombre}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <Button
+                                onClick={() => handleSelectProduct(product)}
+                                className="ml-4 bg-slate-800 hover:bg-slate-700 text-white"
+                                size="sm"
+                                disabled={loading}
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Agregar
+                              </Button>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              {/* Stock */}
+                              <div className="flex items-center space-x-3">
+                                <Badge className={`text-xs border ${stockStatus.color}`}>
+                                  <StatusIcon className="w-3 h-3 mr-1" />
+                                  {stockStatus.text}
+                                </Badge>
+                                <span className="text-sm text-slate-600">
+                                  Stock: <span className="font-medium">{product.stock}</span>
+                                  <span className="text-slate-400"> (mín: {stockMinimo})</span>
+                                </span>
+                                {product.stock <= 0 && (
+                                  <div className="flex items-center text-red-600">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    <span className="text-xs ml-1">Sin disponibilidad</span>
                                   </div>
                                 )}
                               </div>
-                              {product.categoria_nombre && (
-                                <Badge variant="outline" className="mt-2 text-xs">
-                                  {product.categoria_nombre}
-                                </Badge>
-                              )}
-                            </div>
-                            <Button
-                              onClick={() => handleSelectProduct(product)}
-                              className="ml-4 bg-slate-800 hover:bg-slate-700 text-white"
-                              size="sm"
-                            >
-                              <Plus className="h-3 w-3 mr-1" />
-                              Agregar
-                            </Button>
-                          </div>
 
-                          <div className="flex items-center justify-between mt-3">
-                            {/* Stock */}
-                            <div className="flex items-center space-x-2">
-                              <Badge className={`text-xs ${stockStatus.color}`}>{stockStatus.text}</Badge>
-                              <span className="text-xs text-gray-500">
-                                Stock: {product.stock}
-                                {product.stock_minimo && (
-                                  <span className="text-gray-400"> (mín: {product.stock_minimo})</span>
-                                )}
-                              </span>
-                              {product.stock <= 0 && <AlertTriangle className="h-3 w-3 text-red-500" />}
-                            </div>
-
-                            {/* Precios */}
-                            <div className="text-right">
-                              <div className="font-semibold text-gray-900">{formatCurrency(product.precio_venta)}</div>
-                              {product.precio_costo && (
-                                <div className="text-xs text-gray-500">
-                                  Costo: {formatCurrency(product.precio_costo)}
+                              {/* Precios */}
+                              <div className="text-right">
+                                <div className="font-medium text-sm text-slate-900">
+                                  Precio: {formatCurrency(precioVenta)}
                                 </div>
-                              )}
+                                {product.precio_costo && (
+                                  <div className="text-xs text-slate-500">
+                                    Costo: {formatCurrency(product.precio_costo)}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
 
-                {filteredProducts.length === 50 && (
-                  <div className="p-3 text-center text-xs text-gray-500 bg-gray-50">
-                    Mostrando los primeros 50 resultados. Refine su búsqueda para ver más.
-                  </div>
-                )}
-              </div>
-            ) : searchTerm && filteredProducts.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p>No se encontraron productos</p>
-                <p className="text-sm text-gray-400 mt-1">Intente con otros términos de búsqueda</p>
-              </div>
-            ) : (
-              <div className="p-8 text-center text-gray-500">
-                <Search className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p>Busque un producto para agregar</p>
-                <p className="text-sm text-gray-400 mt-1">Use el campo de búsqueda arriba</p>
-              </div>
-            )}
+                  {filteredProducts.length === 50 && (
+                    <div className="p-4 text-center text-xs text-slate-500 bg-slate-50 border-t border-slate-100">
+                      Mostrando los primeros 50 resultados. Refine su búsqueda para ver más productos.
+                    </div>
+                  )}
+                </div>
+              ) : searchTerm && filteredProducts.length === 0 ? (
+                <div className="p-12 text-center text-slate-500">
+                  <Package className="w-16 h-16 mx-auto mb-4 text-slate-300" />
+                  <h3 className="font-medium text-lg mb-2">No se encontraron productos</h3>
+                  <p className="text-sm text-slate-400">
+                    Intente con otros términos de búsqueda o verifique la ortografía
+                  </p>
+                </div>
+              ) : (
+                <div className="p-12 text-center text-slate-500">
+                  <Search className="w-16 h-16 mx-auto mb-4 text-slate-300" />
+                  <h3 className="font-medium text-lg mb-2">Busque productos para agregar</h3>
+                  <p className="text-sm text-slate-400 mb-4">
+                    Use el campo de búsqueda para encontrar productos por nombre, código o marca
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    Los productos sin stock aparecerán marcados y requerirán confirmación
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        {/* Modal de cantidad */}
+        <SalesQuantityModal
+          isOpen={showQuantityModal}
+          onClose={handleQuantityModalClose}
+          onConfirm={handleQuantityConfirm}
+          product={selectedProductForQuantity}
+          loading={loading}
+        />
+      </div>
+    </div>
   )
 }
 

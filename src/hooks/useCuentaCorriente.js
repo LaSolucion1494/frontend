@@ -1,13 +1,14 @@
-// useCuentaCorriente.js - HOOK COMPLETO Y CORREGIDO
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { cuentaCorrienteService } from "../services/cuentaCorrienteService"
 import toast from "react-hot-toast"
 
 export const useCuentaCorriente = (initialFilters = {}) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+
+  // Estados integrados de filtros y paginación con límite más pequeño por defecto
   const [filters, setFilters] = useState({
     cliente: "",
     fechaInicio: "",
@@ -15,9 +16,16 @@ export const useCuentaCorriente = (initialFilters = {}) => {
     tipoPago: "",
     estado: "activo",
     conSaldo: "todos",
-    limit: 50,
+    limit: 10, // Cambiado de 50 a 10 por defecto
     offset: 0,
     ...initialFilters,
+  })
+
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: initialFilters.limit || 10, // Usar el límite inicial o 10 por defecto
   })
 
   // Estados para diferentes tipos de datos
@@ -27,18 +35,52 @@ export const useCuentaCorriente = (initialFilters = {}) => {
   const [movimientos, setMovimientos] = useState([])
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
 
-  // Obtener resumen de cuentas corrientes
+  // Función para actualizar filtros y resetear paginación
+  const updateFilters = useCallback((newFilters) => {
+    setFilters((prev) => ({ ...prev, ...newFilters }))
+    if (newFilters.offset === undefined) {
+      setPagination((prev) => ({ ...prev, currentPage: 1 }))
+    }
+  }, [])
+
+  // Función para manejar cambio de página
+  const handlePageChange = useCallback(
+    (page) => {
+      const newOffset = (page - 1) * filters.limit
+      setFilters((prev) => ({ ...prev, offset: newOffset }))
+      setPagination((prev) => ({ ...prev, currentPage: page }))
+    },
+    [filters.limit],
+  )
+
+  // Obtener resumen de cuentas corrientes CON PAGINACIÓN
   const fetchResumen = useCallback(
     async (customFilters = {}) => {
       setLoading(true)
       setError(null)
 
       try {
-        const finalFilters = { ...filters, ...customFilters }
+        const finalFilters = {
+          ...filters,
+          ...customFilters,
+        }
+
+        console.log("Hook: Fetching resumen with filters:", finalFilters) // Para debug
+
         const result = await cuentaCorrienteService.getResumen(finalFilters)
 
         if (result.success) {
           setResumen(result.data)
+
+          // Actualizar información de paginación si está disponible
+          if (result.pagination) {
+            console.log("Hook: Pagination received:", result.pagination) // Para debug
+            setPagination((prev) => ({
+              ...prev,
+              ...result.pagination,
+            }))
+          }
+
           return { success: true, data: result.data }
         } else {
           setError(result.message)
@@ -61,18 +103,31 @@ export const useCuentaCorriente = (initialFilters = {}) => {
     [filters],
   )
 
-  // Obtener pagos
+  // Obtener pagos CON PAGINACIÓN
   const fetchPagos = useCallback(
     async (customFilters = {}) => {
       setLoading(true)
       setError(null)
 
       try {
-        const finalFilters = { ...filters, ...customFilters }
+        const finalFilters = {
+          ...filters,
+          ...customFilters,
+        }
+
         const result = await cuentaCorrienteService.getPagos(finalFilters)
 
         if (result.success) {
           setPagos(result.data)
+
+          // Actualizar información de paginación si está disponible
+          if (result.pagination) {
+            setPagination((prev) => ({
+              ...prev,
+              ...result.pagination,
+            }))
+          }
+
           return { success: true, data: result.data }
         } else {
           setError(result.message)
@@ -94,6 +149,15 @@ export const useCuentaCorriente = (initialFilters = {}) => {
     },
     [filters],
   )
+
+  // useEffect para auto-refresh cuando cambian los filtros
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchResumen({ silent: true })
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
+  }, [filters])
 
   // Registrar un pago
   const registrarPago = async (pagoData) => {
@@ -146,7 +210,7 @@ export const useCuentaCorriente = (initialFilters = {}) => {
     }
   }
 
-  // Obtener pagos de un cliente específico
+  // Obtener pagos de un cliente específico CON PAGINACIÓN
   const getPagosByClient = async (clientId, customFilters = {}) => {
     if (!clientId || clientId < 1) {
       toast.error("ID de cliente inválido")
@@ -155,10 +219,24 @@ export const useCuentaCorriente = (initialFilters = {}) => {
 
     setLoading(true)
     try {
-      const result = await cuentaCorrienteService.getPagosByClient(clientId, customFilters)
+      const finalFilters = {
+        ...customFilters,
+        limit: filters.limit,
+        offset: filters.offset,
+      }
+
+      const result = await cuentaCorrienteService.getPagosByClient(clientId, finalFilters)
 
       if (result.success) {
-        return { success: true, data: result.data }
+        // Actualizar información de paginación si está disponible
+        if (result.pagination) {
+          setPagination((prev) => ({
+            ...prev,
+            ...result.pagination,
+          }))
+        }
+
+        return { success: true, data: result.data, pagination: result.pagination }
       } else {
         if (!customFilters.silent) {
           toast.error(result.message)
@@ -176,7 +254,7 @@ export const useCuentaCorriente = (initialFilters = {}) => {
     }
   }
 
-  // Obtener movimientos de un cliente específico
+  // Obtener movimientos de un cliente específico CON PAGINACIÓN
   const getMovimientosByClient = async (clientId, customFilters = {}) => {
     if (!clientId || clientId < 1) {
       toast.error("ID de cliente inválido")
@@ -190,7 +268,8 @@ export const useCuentaCorriente = (initialFilters = {}) => {
       if (result.success) {
         setMovimientos(result.data.movimientos || [])
         setClienteSeleccionado(result.data.cliente)
-        return { success: true, data: result.data }
+
+        return { success: true, data: result.data, pagination: result.pagination }
       } else {
         if (!customFilters.silent) {
           toast.error(result.message)
@@ -261,11 +340,6 @@ export const useCuentaCorriente = (initialFilters = {}) => {
     [filters],
   )
 
-  // Actualizar filtros
-  const updateFilters = useCallback((newFilters) => {
-    setFilters((prev) => ({ ...prev, ...newFilters }))
-  }, [])
-
   // Limpiar filtros
   const clearFilters = useCallback(() => {
     setFilters({
@@ -275,8 +349,14 @@ export const useCuentaCorriente = (initialFilters = {}) => {
       tipoPago: "",
       estado: "activo",
       conSaldo: "todos",
-      limit: 50,
+      limit: 10, // Mantener límite pequeño
       offset: 0,
+    })
+    setPagination({
+      currentPage: 1,
+      totalPages: 1,
+      totalItems: 0,
+      itemsPerPage: 10,
     })
   }, [])
 
@@ -325,6 +405,7 @@ export const useCuentaCorriente = (initialFilters = {}) => {
     loading,
     error,
     filters,
+    pagination,
     resumen,
     pagos,
     estadisticas,
@@ -341,9 +422,12 @@ export const useCuentaCorriente = (initialFilters = {}) => {
     getMovimientosByClient,
     crearAjuste,
 
-    // Utilidades
+    // Funciones de paginación
     updateFilters,
+    handlePageChange,
     clearFilters,
+
+    // Utilidades
     getLocalStats,
     formatCurrency,
     formatDate,

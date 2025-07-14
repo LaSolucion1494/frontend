@@ -127,10 +127,6 @@ const ClientModal = ({ isOpen, onClose, onSave, client, isEditing, loading }) =>
       newErrors.telefono = "El teléfono no puede exceder 20 caracteres"
     }
 
-    if (formData.cuit.length > 15) {
-      newErrors.cuit = "El CUIT no puede exceder 15 caracteres"
-    }
-
     if (formData.direccion.length > 500) {
       newErrors.direccion = "La dirección no puede exceder 500 caracteres"
     }
@@ -239,7 +235,6 @@ const ClientModal = ({ isOpen, onClose, onSave, client, isEditing, loading }) =>
                     type="text"
                     value={formData.nombre}
                     onChange={(e) => handleInputChange("nombre", e.target.value)}
-                    placeholder="Ej: Juan Pérez"
                     className={`bg-slate-50 ${errors.nombre ? "border-red-500 focus:border-red-500" : "border-slate-800"}`}
                     disabled={loading}
                     maxLength={100}
@@ -263,7 +258,6 @@ const ClientModal = ({ isOpen, onClose, onSave, client, isEditing, loading }) =>
                       type="tel"
                       value={formData.telefono}
                       onChange={(e) => handleInputChange("telefono", e.target.value)}
-                      placeholder="Ej: +54 11 1234-5678"
                       className={`bg-slate-50 ${errors.telefono ? "border-red-500 focus:border-red-500" : "border-slate-800"}`}
                       disabled={loading}
                       maxLength={20}
@@ -286,7 +280,6 @@ const ClientModal = ({ isOpen, onClose, onSave, client, isEditing, loading }) =>
                       type="email"
                       value={formData.email}
                       onChange={(e) => handleInputChange("email", e.target.value)}
-                      placeholder="Ej: cliente@email.com"
                       className={`bg-slate-50 ${errors.email ? "border-red-500 focus:border-red-500" : "border-slate-800"}`}
                       disabled={loading}
                     />
@@ -310,7 +303,6 @@ const ClientModal = ({ isOpen, onClose, onSave, client, isEditing, loading }) =>
                       type="text"
                       value={formData.cuit}
                       onChange={(e) => handleInputChange("cuit", e.target.value)}
-                      placeholder="Ej: 20-12345678-9"
                       className={`bg-slate-50 ${errors.cuit ? "border-red-500 focus:border-red-500" : "border-slate-800"}`}
                       disabled={loading}
                       maxLength={15}
@@ -333,7 +325,6 @@ const ClientModal = ({ isOpen, onClose, onSave, client, isEditing, loading }) =>
                       type="text"
                       value={formData.direccion}
                       onChange={(e) => handleInputChange("direccion", e.target.value)}
-                      placeholder="Ej: Av. Corrientes 1234"
                       className={`bg-slate-50 ${errors.direccion ? "border-red-500 focus:border-red-500" : "border-slate-800"}`}
                       disabled={loading}
                       maxLength={500}
@@ -356,7 +347,6 @@ const ClientModal = ({ isOpen, onClose, onSave, client, isEditing, loading }) =>
                     id="notas"
                     value={formData.notas}
                     onChange={(e) => handleInputChange("notas", e.target.value)}
-                    placeholder="Notas adicionales sobre el cliente..."
                     className={`h-20 resize-none bg-slate-50 ${errors.notas ? "border-red-500 focus:border-red-500" : "border-slate-800"}`}
                     disabled={loading}
                     maxLength={1000}

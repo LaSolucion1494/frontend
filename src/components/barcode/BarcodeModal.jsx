@@ -1,21 +1,9 @@
 "use client"
 import { Button } from "../ui/button"
-import { X, Printer } from "lucide-react"
+import { X, } from "lucide-react"
 import BarcodeDisplay from "./BarcodeDisplay"
-import { barcodeService } from "../../services/barcodeService"
-import toast from "react-hot-toast"
 
 const BarcodeModal = ({ isOpen, onClose, product }) => {
-  const handlePrintMultiple = async () => {
-    try {
-      const products = [product]
-      const pdf = await barcodeService.generatePrintablePDF(products)
-      pdf.save(`codigo-barras-${product.codigo}.pdf`)
-      toast.success("PDF generado para impresión")
-    } catch (error) {
-      toast.error("Error al generar PDF")
-    }
-  }
 
   if (!isOpen || !product) return null
 
@@ -43,13 +31,6 @@ const BarcodeModal = ({ isOpen, onClose, product }) => {
         {/* Content */}
         <div className="p-6 space-y-6">
           <BarcodeDisplay code={product.codigo} productName={product.nombre} showControls={true} size="large" />
-
-          <div className="flex justify-center">
-            <Button onClick={handlePrintMultiple} variant="outline" className="min-w-[120px] bg-transparent">
-              <Printer className="w-4 h-4 mr-2" />
-              Imprimir PDF
-            </Button>
-          </div>
         </div>
 
         {/* Footer */}

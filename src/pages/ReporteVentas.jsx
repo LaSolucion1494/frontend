@@ -33,30 +33,43 @@ import {
   CheckCircle2,
   History,
   PieChart,
-  BarChart3,
+  ExternalLink,
+  Trash2,
 } from "lucide-react"
 import SaleDetailsModal from "../components/reportes-ventas/SaleDetailsModal"
+import CancelSaleModal from "../components/reportes-ventas/CancelSaleModal"
 import { useSalesReports } from "../hooks/useSalesReports"
 import { formatCurrency } from "../lib/utils"
 import { extractExactDateTime } from "../lib/date-utils"
 import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert"
+import { useNavigate } from "react-router-dom"
+import Pagination from "../components/ui/Pagination"
+import { Loading, LoadingOverlay } from "../components/ui/loading"
 
 const ReporteVentas = () => {
-  const [filters, setFilters] = useState({
-    fechaInicio: "",
-    fechaFin: "",
-    cliente: "",
-    numeroFactura: "",
-    estado: "todos",
-    tipoPago: "todos",
-  })
+  const navigate = useNavigate()
 
   const [selectedSale, setSelectedSale] = useState(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-  const [showFilters, setShowFilters] = useState(false)
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
+  const [showFilterCard, setShowFilterCard] = useState(false)
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [activeTab, setActiveTab] = useState("historial")
 
-  const { sales, stats, loading, error, fetchSales, fetchStats, exportSales, getSaleById } = useSalesReports()
+  const {
+    sales,
+    stats,
+    loading,
+    error,
+    pagination,
+    fetchSales,
+    fetchStats,
+    exportSales,
+    getSaleById,
+    cancelSale,
+    updateFilters,
+    handlePageChange,
+  } = useSalesReports()
 
   // Cargar datos iniciales (últimos 30 días)
   useEffect(() => {
@@ -64,27 +77,40 @@ const ReporteVentas = () => {
     const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
 
     const initialFilters = {
-      ...filters,
       fechaInicio: thirtyDaysAgo.toISOString().split("T")[0],
       fechaFin: today.toISOString().split("T")[0],
+      offset: 0,
     }
 
-    setFilters(initialFilters)
-    handleApplyFilters(initialFilters)
-  }, [])
+    updateFilters(initialFilters)
+  }, [updateFilters])
 
-  const handleApplyFilters = async (customFilters = filters) => {
-    await Promise.all([fetchSales(customFilters), fetchStats(customFilters)])
+  const handleApplyFilters = async () => {
+    await Promise.all([fetchSales({ offset: 0 }), fetchStats()])
   }
 
   const handleFilterChange = (field, value) => {
-    const newFilters = { ...filters, [field]: value }
-    setFilters(newFilters)
+    const newFilters = { [field]: value }
 
-    // Auto-aplicar filtros para búsqueda rápida
-    if (field === "cliente" || field === "numeroFactura") {
+    // Reset offset cuando se cambian filtros
+    if (field !== "offset") {
+      newFilters.offset = 0
+    }
+
+    updateFilters(newFilters)
+
+    // Auto-aplicar filtros para búsqueda rápida y avanzados
+    if (
+      field === "cliente" ||
+      field === "numeroFactura" ||
+      field === "estado" ||
+      field === "tipoPago" ||
+      field === "fechaInicio" ||
+      field === "fechaFin"
+    ) {
       const timeoutId = setTimeout(() => {
-        handleApplyFilters(newFilters)
+        fetchSales(newFilters)
+        fetchStats(newFilters)
       }, 500)
       return () => clearTimeout(timeoutId)
     }
@@ -95,13 +121,14 @@ const ReporteVentas = () => {
     const startDate = new Date(today.getTime() - days * 24 * 60 * 60 * 1000)
 
     const newFilters = {
-      ...filters,
       fechaInicio: startDate.toISOString().split("T")[0],
       fechaFin: today.toISOString().split("T")[0],
+      offset: 0,
     }
 
-    setFilters(newFilters)
-    handleApplyFilters(newFilters)
+    updateFilters(newFilters)
+    fetchSales(newFilters)
+    fetchStats(newFilters)
   }
 
   const handleResetFilters = () => {
@@ -112,12 +139,15 @@ const ReporteVentas = () => {
       numeroFactura: "",
       estado: "todos",
       tipoPago: "todos",
+      offset: 0,
     }
-    setFilters(resetFilters)
-    handleApplyFilters(resetFilters)
+    updateFilters(resetFilters)
+    fetchSales(resetFilters)
+    fetchStats(resetFilters)
   }
 
   const handleViewSaleDetails = async (saleId) => {
+    console.log("Viewing sale details for ID:", saleId)
     const result = await getSaleById(saleId)
     if (result.success) {
       setSelectedSale(result.data)
@@ -125,8 +155,26 @@ const ReporteVentas = () => {
     }
   }
 
+  // Nueva función para abrir el modal de cancelación
+  const handleCancelSale = async (saleId) => {
+    const result = await getSaleById(saleId)
+    if (result.success) {
+      setSelectedSale(result.data)
+      setIsCancelModalOpen(true)
+    }
+  }
+
   const handleExport = async () => {
-    await exportSales(filters)
+    await exportSales()
+  }
+
+  const handleNavigateToCuentaCorriente = () => {
+    navigate("/cuenta-corriente")
+  }
+
+  const handleRefresh = () => {
+    fetchSales({ offset: 0 })
+    fetchStats()
   }
 
   // Función para determinar el método de pago principal
@@ -217,187 +265,239 @@ const ReporteVentas = () => {
 
   const additionalStats = calculateAdditionalStats()
 
+  // Función para verificar si se puede cancelar la venta
+  const canCancelSale = (sale) => {
+    return sale.estado !== "anulada"
+  }
+
+  if (loading && sales.length === 0) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
+          <Loading text="Cargando reportes de ventas..." size="lg" />
+        </div>
+      </Layout>
+    )
+  }
+
   return (
     <Layout>
       <div className="min-h-screen bg-gray-50/50">
         <div className="container mx-auto p-4 md:p-6 lg:p-8 max-w-[95rem]">
-          {/* Header */}
-          <div className="mb-8">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">Reportes de Ventas</h1>
-                <p className="text-muted-foreground mt-2">
-                  Análisis detallado del rendimiento de ventas y métricas del negocio
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={() => setShowFilters(!showFilters)} variant="outline" disabled={loading}>
-                  <Filter className="w-4 h-4 mr-2" />
-                  Filtros
-                  {showFilters ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}
-                </Button>
-                <Button onClick={handleExport} variant="outline" disabled={loading}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Exportar
-                </Button>
-                <Button onClick={() => handleApplyFilters()} disabled={loading} className="bg-slate-800 hover:bg-slate-900">
-                  <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-                  Actualizar
-                </Button>
-              </div>
+          {/* Header y Botones de Acción */}
+          <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Reportes de Ventas</h1>
+              <p className="text-muted-foreground mt-2">
+                Análisis detallado del rendimiento de ventas y métricas del negocio
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleNavigateToCuentaCorriente}
+                variant="outline"
+                className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+              >
+                <Building className="w-4 h-4 mr-2" />
+                Cuenta Corriente
+                <ExternalLink className="w-4 h-4 ml-2" />
+              </Button>
+              <Button onClick={() => setShowFilterCard(!showFilterCard)} variant="outline" disabled={loading}>
+                <Filter className="w-4 h-4 mr-2" />
+                {showFilterCard ? "Ocultar Filtros" : "Mostrar Filtros"}
+                {showFilterCard ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}
+              </Button>
+              <Button onClick={handleExport} variant="outline" disabled={loading}>
+                <Download className="w-4 h-4 mr-2" />
+                Exportar
+              </Button>
+              <Button onClick={handleRefresh} disabled={loading} className="bg-slate-800 hover:bg-slate-900">
+                <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                Actualizar
+              </Button>
             </div>
           </div>
 
           {/* Filtros */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Search className="w-5 h-5" />
-                Filtros y Búsqueda
-              </CardTitle>
-              <CardDescription>Filtra las ventas por período, cliente, método de pago y más criterios</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {/* Búsqueda rápida */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="cliente">Buscar cliente</Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                      <Input
-                        id="cliente"
-                        placeholder="Nombre del cliente..."
-                        value={filters.cliente}
-                        onChange={(e) => handleFilterChange("cliente", e.target.value)}
-                        className="pl-10 border-slate-800"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="numeroFactura">Número de factura</Label>
-                    <div className="relative">
-                      <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                      <Input
-                        id="numeroFactura"
-                        placeholder="Número de factura..."
-                        value={filters.numeroFactura}
-                        onChange={(e) => handleFilterChange("numeroFactura", e.target.value)}
-                        className="pl-10 border-slate-800"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Períodos rápidos</Label>
-                    <div className="flex gap-2">
-                      <Button onClick={() => handleQuickDateFilter(7)} variant="outline" size="sm" className="flex-1 h-10 border-slate-800">
-                        <Clock className="w-4 h-4 mr-1" />7 días
-                      </Button>
-                      <Button onClick={() => handleQuickDateFilter(30)} variant="outline" size="sm" className="flex-1 h-10 border-slate-800">
-                        30 días
-                      </Button>
-                      <Button onClick={() => handleQuickDateFilter(90)} variant="outline" size="sm" className="flex-1 h-10 border-slate-800">
-                        90 días
-                      </Button>
-                    </div>
-                  </div>
+          {showFilterCard && (
+            <Card className="mb-6">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Search className="w-5 h-5" />
+                    Filtros y Búsqueda
+                  </CardTitle>
+                  <Button
+                    onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:bg-muted"
+                    title={showAdvancedFilters ? "Ocultar filtros avanzados" : "Mostrar filtros avanzados"}
+                  >
+                    {showAdvancedFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    <span className="sr-only">
+                      {showAdvancedFilters ? "Ocultar filtros avanzados" : "Mostrar filtros avanzados"}
+                    </span>
+                  </Button>
                 </div>
-
-                {/* Filtros avanzados */}
-                {showFilters && (
-                  <div className="border-t pt-4 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="fechaInicio">Fecha inicio</Label>
-                        <div className="relative">
-                          <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                          <Input
-                            id="fechaInicio"
-                            type="date"
-                            value={filters.fechaInicio}
-                            onChange={(e) => handleFilterChange("fechaInicio", e.target.value)}
-                            className="pl-10"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="fechaFin">Fecha fin</Label>
-                        <div className="relative">
-                          <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                          <Input
-                            id="fechaFin"
-                            type="date"
-                            value={filters.fechaFin}
-                            onChange={(e) => handleFilterChange("fechaFin", e.target.value)}
-                            className="pl-10"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="estado">Estado</Label>
-                        <select
-                          id="estado"
-                          value={filters.estado}
-                          onChange={(e) => handleFilterChange("estado", e.target.value)}
-                          className="w-full h-10 px-3 border border-input rounded-md text-sm focus:border-ring focus:ring-ring/20"
-                        >
-                          <option value="todos">Todos los estados</option>
-                          <option value="completada">Completadas</option>
-                          <option value="anulada">Anuladas</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="tipoPago">Método de pago</Label>
-                        <select
-                          id="tipoPago"
-                          value={filters.tipoPago}
-                          onChange={(e) => handleFilterChange("tipoPago", e.target.value)}
-                          className="w-full h-10 px-3 border border-input rounded-md text-sm focus:border-ring focus:ring-ring/20"
-                        >
-                          <option value="todos">Todos los métodos</option>
-                          <option value="efectivo">Efectivo</option>
-                          <option value="tarjeta">Tarjeta</option>
-                          <option value="transferencia">Transferencia</option>
-                          <option value="cuenta_corriente">Cuenta Corriente</option>
-                          <option value="varios">Varios métodos</option>
-                          <option value="otro">Otro</option>
-                        </select>
+                <CardDescription>
+                  Filtra las ventas por período, cliente, método de pago y más criterios
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Búsqueda rápida */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="cliente">Buscar cliente</Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                        <Input
+                          id="cliente"
+                          placeholder="Nombre del cliente..."
+                          value={pagination.cliente || ""}
+                          onChange={(e) => handleFilterChange("cliente", e.target.value)}
+                          className="pl-10 border-slate-800"
+                        />
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-center pt-4 border-t">
-                      <div className="text-sm text-muted-foreground">
-                        {sales.length} venta{sales.length !== 1 ? "s" : ""} encontrada{sales.length !== 1 ? "s" : ""}
+                    <div className="space-y-2">
+                      <Label htmlFor="numeroFactura">Número de factura</Label>
+                      <div className="relative">
+                        <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                        <Input
+                          id="numeroFactura"
+                          placeholder="Número de factura..."
+                          value={pagination.numeroFactura || ""}
+                          onChange={(e) => handleFilterChange("numeroFactura", e.target.value)}
+                          className="pl-10 border-slate-800"
+                        />
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Períodos rápidos</Label>
                       <div className="flex gap-2">
-                        <Button onClick={handleResetFilters} variant="outline" size="sm">
-                          <X className="w-4 h-4 mr-2" />
-                          Limpiar Filtros
+                        <Button
+                          onClick={() => handleQuickDateFilter(7)}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 h-10 border-slate-800"
+                        >
+                          <Clock className="w-4 h-4 mr-1" />7 días
                         </Button>
-                        <Button onClick={() => handleApplyFilters()} size="sm">
-                          <Filter className="w-4 h-4 mr-2" />
-                          Aplicar Filtros
+                        <Button
+                          onClick={() => handleQuickDateFilter(30)}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 h-10 border-slate-800"
+                        >
+                          30 días
+                        </Button>
+                        <Button
+                          onClick={() => handleQuickDateFilter(90)}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 h-10 border-slate-800"
+                        >
+                          90 días
                         </Button>
                       </div>
                     </div>
                   </div>
-                )}
 
-                {error && (
-                  <Alert className="border-red-200 bg-red-50">
-                    <AlertCircle className="h-4 w-4 text-red-600" />
-                    <AlertTitle className="text-red-900">Error</AlertTitle>
-                    <AlertDescription className="text-red-800">{error}</AlertDescription>
-                  </Alert>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  {/* Filtros avanzados */}
+                  {showAdvancedFilters && (
+                    <div className="border-t pt-4 space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="fechaInicio">Fecha inicio</Label>
+                          <div className="relative">
+                            <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                            <Input
+                              id="fechaInicio"
+                              type="date"
+                              value={pagination.fechaInicio || ""}
+                              onChange={(e) => handleFilterChange("fechaInicio", e.target.value)}
+                              className="pl-10"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="fechaFin">Fecha fin</Label>
+                          <div className="relative">
+                            <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                            <Input
+                              id="fechaFin"
+                              type="date"
+                              value={pagination.fechaFin || ""}
+                              onChange={(e) => handleFilterChange("fechaFin", e.target.value)}
+                              className="pl-10"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="estado">Estado</Label>
+                          <select
+                            id="estado"
+                            value={pagination.estado || "todos"}
+                            onChange={(e) => handleFilterChange("estado", e.target.value)}
+                            className="w-full h-10 px-3 border border-input rounded-md text-sm focus:border-ring focus:ring-ring/20"
+                          >
+                            <option value="todos">Todos los estados</option>
+                            <option value="completada">Completadas</option>
+                            <option value="anulada">Anuladas</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="tipoPago">Método de pago</Label>
+                          <select
+                            id="tipoPago"
+                            value={pagination.tipoPago || "todos"}
+                            onChange={(e) => handleFilterChange("tipoPago", e.target.value)}
+                            className="w-full h-10 px-3 border border-input rounded-md text-sm focus:border-ring focus:ring-ring/20"
+                          >
+                            <option value="todos">Todos los métodos</option>
+                            <option value="efectivo">Efectivo</option>
+                            <option value="tarjeta">Tarjeta</option>
+                            <option value="transferencia">Transferencia</option>
+                            <option value="cuenta_corriente">Cuenta Corriente</option>
+                            <option value="varios">Varios métodos</option>
+                            <option value="otro">Otro</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center pt-4 border-t">
+                        <div className="text-sm text-muted-foreground">
+                          {pagination.totalItems} venta{pagination.totalItems !== 1 ? "s" : ""} encontrada
+                          {pagination.totalItems !== 1 ? "s" : ""}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button onClick={handleResetFilters} variant="outline" size="sm">
+                            <X className="w-4 h-4 mr-2" />
+                            Limpiar Filtros
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {error && (
+                    <Alert className="border-red-200 bg-red-50">
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                      <AlertTitle className="text-red-900">Error</AlertTitle>
+                      <AlertDescription className="text-red-800">{error}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Tabs para separar Historial y Reportes */}
           <Tabs defaultValue="historial" value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -423,138 +523,155 @@ const ReporteVentas = () => {
                         Historial de Ventas
                       </CardTitle>
                       <CardDescription>
-                        {sales.length} registro{sales.length !== 1 ? "s" : ""} encontrado{sales.length !== 1 ? "s" : ""}
+                        {pagination.totalItems} registro{pagination.totalItems !== 1 ? "s" : ""} encontrado
+                        {pagination.totalItems !== 1 ? "s" : ""}
                       </CardDescription>
                     </div>
                     <Badge variant="outline" className="w-fit">
-                      Total: {sales.length}
+                      Total: {pagination.totalItems}
                     </Badge>
                   </div>
                 </CardHeader>
 
-                <CardContent className="-mt-3"> 
-                  {loading ? (
-                    <div className="flex flex-col items-center justify-center py-16">
-                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
-                      <p className="text-muted-foreground font-medium">Cargando ventas...</p>
-                      <p className="text-sm text-muted-foreground mt-1">Esto puede tomar unos segundos</p>
-                    </div>
-                  ) : sales.length === 0 ? (
-                    <div className="text-center py-16">
-                      <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                      <h3 className="text-lg font-medium text-muted-foreground mb-2">No se encontraron ventas</h3>
-                      <p className="text-muted-foreground mb-4">
-                        No hay ventas que coincidan con los filtros aplicados
-                      </p>
-                      <Button onClick={handleResetFilters} variant="outline" size="sm">
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Limpiar filtros
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-slate-800">
-                          <tr className="border-b">
-                            <th className="text-slate-100 text-left py-3 px-4 font-medium text-muted-foreground">Factura</th>
-                            <th className="text-slate-100 text-left py-3 px-4 font-medium text-muted-foreground">Fecha</th>
-                            <th className="text-slate-100 text-left py-3 px-4 font-medium text-muted-foreground">Cliente</th>
-                            <th className="text-slate-100 text-left py-3 px-4 font-medium text-muted-foreground">Total</th>
-                            <th className="text-slate-100 text-center py-3 px-4 font-medium text-muted-foreground">Método de Pago</th>
-                            <th className="text-slate-100 text-center py-3 px-4 font-medium text-muted-foreground">Estado</th>
-                            <th className="text-slate-100 text-center py-3 px-4 font-medium text-muted-foreground">Acciones</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sales.map((sale, index) => {
-                            const paymentMethod = getPaymentMethodDisplay(sale)
-                            const IconComponent = paymentMethod.icon
-                            const dateTime = extractExactDateTime(sale.fecha_creacion)
+                <CardContent className="-mt-3">
+                  <LoadingOverlay loading={loading && sales.length > 0} text="Actualizando...">
+                    {sales.length === 0 && !loading ? (
+                      <div className="text-center py-16">
+                        <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                        <h3 className="text-lg font-medium text-muted-foreground mb-2">No se encontraron ventas</h3>
+                        <p className="text-muted-foreground mb-4">
+                          No hay ventas que coincidan con los filtros aplicados
+                        </p>
+                        <Button onClick={handleResetFilters} variant="outline" size="sm">
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Limpiar filtros
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-slate-800">
+                            <tr className="border-b">
+                              <th className="text-slate-100 text-left py-3 px-4 font-medium">Factura</th>
+                              <th className="text-slate-100 text-left py-3 px-4 font-medium">Fecha</th>
+                              <th className="text-slate-100 text-left py-3 px-4 font-medium">Cliente</th>
+                              <th className="text-slate-100 text-left py-3 px-4 font-medium">Total</th>
+                              <th className="text-slate-100 text-center py-3 px-4 font-medium">Método de Pago</th>
+                              <th className="text-slate-100 text-center py-3 px-4 font-medium">Estado</th>
+                              <th className="text-slate-100 text-center py-3 px-4 font-medium">Acciones</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sales.map((sale) => {
+                              const paymentMethod = getPaymentMethodDisplay(sale)
+                              const IconComponent = paymentMethod.icon
+                              const dateTime = extractExactDateTime(sale.fecha_creacion)
 
-                            return (
-                              <tr key={sale.id} className="border-b hover:bg-muted/50 transition-colors">
-                                <td className="py-3 px-4">
-                                  <div className="flex items-center gap-2">
-                                    <FileText className="w-4 h-4 text-muted-foreground" />
-                                    <span className="font-mono font-medium text-sm">{sale.numero_factura}</span>
-                                  </div>
-                                </td>
-
-                                <td className="py-3 px-4">
-                                  <div>
-                                    <span className="text-sm font-medium">{dateTime.date}</span>
-                                    <p className="text-xs text-muted-foreground">{dateTime.time}</p>
-                                  </div>
-                                </td>
-
-                                <td className="py-3 px-4">
-                                  <div className="flex items-center gap-2">
-                                    <User className="w-4 h-4 text-muted-foreground" />
-                                    <span className="text-sm truncate max-w-xs">
-                                      {sale.cliente_nombre || "Cliente no especificado"}
-                                    </span>
-                                  </div>
-                                </td>
-
-                                <td className="py-3 px-4">
-                                  <div>
-                                    <span className="font-bold text-green-600">
-                                      {formatCurrency(Number(sale.total) || 0)}
-                                    </span>
-                                    {Number(sale.descuento) > 0 && (
-                                      <p className="text-xs text-red-600 mt-1">
-                                        Desc: -{formatCurrency(Number(sale.descuento))}
-                                      </p>
-                                    )}
-                                  </div>
-                                </td>
-
-                                <td className="py-3 px-4 text-center">
-                                  <Badge variant="outline" className={paymentMethod.color}>
-                                    <div className="flex items-center gap-1">
-                                      <IconComponent className="w-3 h-3" />
-                                      <span className="text-xs">{paymentMethod.label}</span>
+                              return (
+                                <tr key={sale.id} className="border-b hover:bg-muted/50 transition-colors">
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-2">
+                                      <FileText className="w-4 h-4 text-muted-foreground" />
+                                      <span className="font-mono font-medium text-sm">{sale.numero_factura}</span>
                                     </div>
-                                  </Badge>
-                                </td>
+                                  </td>
 
-                                <td className="py-3 px-4 text-center">
-                                  <Badge
-                                    variant="outline"
-                                    className={
-                                      sale.estado === "completada"
-                                        ? "border-green-200 text-green-700 bg-green-50"
+                                  <td className="py-3 px-4">
+                                    <div>
+                                      <span className="text-sm font-medium">{dateTime.date}</span>
+                                      <p className="text-xs text-muted-foreground">{dateTime.time}</p>
+                                    </div>
+                                  </td>
+
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-2">
+                                      <User className="w-4 h-4 text-muted-foreground" />
+                                      <span className="text-sm truncate max-w-xs">
+                                        {sale.cliente_nombre || "Cliente no especificado"}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  <td className="py-3 px-4">
+                                    <div>
+                                      <span className="font-bold text-green-600">
+                                        {formatCurrency(Number(sale.total) || 0)}
+                                      </span>
+                                      {Number(sale.descuento) > 0 && (
+                                        <p className="text-xs text-red-600 mt-1">
+                                          Desc: -{formatCurrency(Number(sale.descuento))}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  <td className="py-3 px-4 text-center">
+                                    <Badge variant="outline" className={paymentMethod.color}>
+                                      <div className="flex items-center gap-1">
+                                        <IconComponent className="w-3 h-3" />
+                                        <span className="text-xs">{paymentMethod.label}</span>
+                                      </div>
+                                    </Badge>
+                                  </td>
+
+                                  <td className="py-3 px-4 text-center">
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        sale.estado === "completada"
+                                          ? "border-green-200 text-green-700 bg-green-50"
+                                          : sale.estado === "anulada"
+                                            ? "border-red-200 text-red-700 bg-red-50"
+                                            : "border-gray-200 text-gray-700 bg-gray-50"
+                                      }
+                                    >
+                                      {sale.estado === "completada"
+                                        ? "Completada"
                                         : sale.estado === "anulada"
-                                          ? "border-red-200 text-red-700 bg-red-50"
-                                          : "border-gray-200 text-gray-700 bg-gray-50"
-                                    }
-                                  >
-                                    {sale.estado === "completada"
-                                      ? "Completada"
-                                      : sale.estado === "anulada"
-                                        ? "Anulada"
-                                        : "Sin estado"}
-                                  </Badge>
-                                </td>
+                                          ? "Anulada"
+                                          : "Sin estado"}
+                                    </Badge>
+                                  </td>
 
-                                <td className="py-3 px-4 text-center">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleViewSaleDetails(sale.id)}
-                                    className="h-8 w-8 p-0"
-                                    title="Ver detalles"
-                                  >
-                                    <Eye className="w-4 h-4" />
-                                  </Button>
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                                  <td className="py-3 px-4 text-center">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleViewSaleDetails(sale.id)}
+                                        className="h-8 w-8 p-0"
+                                        title="Ver detalles"
+                                      >
+                                        <Eye className="w-4 h-4" />
+                                      </Button>
+                                      {canCancelSale(sale) && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => handleCancelSale(sale.id)}
+                                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                          title="Anular venta"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </LoadingOverlay>
+                  <Pagination
+                    currentPage={pagination.currentPage}
+                    totalPages={pagination.totalPages}
+                    onPageChange={handlePageChange}
+                    totalItems={pagination.totalItems}
+                    itemsPerPage={pagination.itemsPerPage}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -761,6 +878,14 @@ const ReporteVentas = () => {
             isOpen={isDetailsModalOpen}
             onClose={() => setIsDetailsModalOpen(false)}
             sale={selectedSale}
+          />
+
+          {/* Modal de cancelación de venta */}
+          <CancelSaleModal
+            isOpen={isCancelModalOpen}
+            onClose={() => setIsCancelModalOpen(false)}
+            sale={selectedSale}
+            onCancel={cancelSale}
           />
         </div>
       </div>

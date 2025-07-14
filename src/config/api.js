@@ -1,6 +1,6 @@
 import axios from "axios"
 
-// Configuración base de la API
+// CORREGIDO: Verificar que el puerto coincida con tu servidor backend
 export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4486/api"
 
 // Instancia de axios configurada
@@ -20,6 +20,14 @@ let isRedirecting = false
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    // AGREGADO: Log para debugging
+    console.error("API Error:", {
+      status: error.response?.status,
+      url: error.config?.url,
+      baseURL: error.config?.baseURL,
+      message: error.message,
+    })
+
     // Solo redirigir en rutas protegidas, no en login/register
     const currentPath = window.location.pathname
     const isAuthRoute = currentPath === "/login" || currentPath === "/register"

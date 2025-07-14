@@ -51,8 +51,8 @@ export const useSales = (initialFilters = {}) => {
             descuento_formatted: salesService.formatCurrency(sale.descuento),
             interes_formatted: salesService.formatCurrency(sale.interes),
             total_formatted: salesService.formatCurrency(sale.total),
-            fecha_venta_formatted: new Date(sale.fecha_venta).toLocaleDateString("es-AR"),
-            fecha_creacion_formatted: new Date(sale.fecha_creacion).toLocaleDateString("es-AR"),
+            fecha_venta_formatted: salesService.formatDate(sale.fecha_venta),
+            fecha_creacion_formatted: salesService.formatDate(sale.fecha_creacion),
             hora_creacion_formatted: new Date(sale.fecha_creacion).toLocaleTimeString("es-AR", {
               hour: "2-digit",
               minute: "2-digit",
@@ -118,7 +118,7 @@ export const useSales = (initialFilters = {}) => {
           descuento_formatted: salesService.formatCurrency(result.data.descuento),
           interes_formatted: salesService.formatCurrency(result.data.interes),
           total_formatted: salesService.formatCurrency(result.data.total),
-          fecha_venta_formatted: new Date(result.data.fecha_venta).toLocaleDateString("es-AR"),
+          fecha_venta_formatted: salesService.formatDate(result.data.fecha_venta),
           hora_venta_formatted: new Date(result.data.fecha_venta).toLocaleTimeString("es-AR", {
             hour: "2-digit",
             minute: "2-digit",
@@ -150,9 +150,9 @@ export const useSales = (initialFilters = {}) => {
           cuenta_corriente_summary: result.data.tiene_cuenta_corriente
             ? {
                 usado: true,
-                pagos_cc: result.data.pagos?.filter((p) => p.tipo_pago === "cuenta_corriente") || [],
+                pagos_cc: result.data.pagos?.filter((p) => p.tipo === "cuenta_corriente") || [],
                 total_cc: result.data.pagos
-                  ?.filter((p) => p.tipo_pago === "cuenta_corriente")
+                  ?.filter((p) => p.tipo === "cuenta_corriente")
                   .reduce((sum, p) => sum + p.monto, 0),
                 movimiento_principal_id: result.data.movimiento_cuenta_id,
               }
@@ -183,6 +183,7 @@ export const useSales = (initialFilters = {}) => {
     setValidationErrors([])
 
     try {
+      // Use the local validation wrapper
       const validation = validateSaleData(saleData)
       if (!validation.isValid) {
         setValidationErrors(validation.errors)
@@ -192,6 +193,7 @@ export const useSales = (initialFilters = {}) => {
 
       const tienePagoCuentaCorriente = saleData.pagos?.some((pago) => pago.tipo === "cuenta_corriente")
       if (tienePagoCuentaCorriente && saleData.selectedClient) {
+        // Use the local validation wrapper
         const creditValidation = validateCreditSale(saleData.selectedClient, saleData)
         if (!creditValidation.isValid) {
           setValidationErrors(creditValidation.errors)
@@ -472,7 +474,7 @@ export const useSales = (initialFilters = {}) => {
     }
   }
 
-  // Validar datos de venta
+  // Validar datos de venta (LOCAL WRAPPER)
   const validateSaleData = (saleData) => {
     const errors = []
 
@@ -515,44 +517,23 @@ export const useSales = (initialFilters = {}) => {
     }
   }
 
-  // Validar venta con cuenta corriente
+  // Validar venta con cuenta corriente (LOCAL WRAPPER)
   const validateCreditSale = (cliente, saleData) => {
     const errors = []
 
-    if (!cliente || !cliente.tiene_cuenta_corriente) {
-      errors.push("El cliente no tiene cuenta corriente habilitada")
-      return { isValid: false, errors }
+    const montoCuentaCorriente =
+      saleData.pagos
+        ?.filter((pago) => pago.tipo === "cuenta_corriente")
+        .reduce((sum, pago) => sum + Number.parseFloat(pago.monto), 0) || 0
+
+    const creditCheck = salesService.canSellOnCredit(cliente, montoCuentaCorriente)
+
+    if (!creditCheck.canSell) {
+      errors.push(creditCheck.message)
     }
-
-    const saldoActual = cliente.saldo_cuenta_corriente || cliente.saldo_actual || 0
-    const limiteCredito = cliente.limite_credito
-
-    const montoCuentaCorriente = saleData.pagos
-      ?.filter((pago) => pago.tipo === "cuenta_corriente")
-      .reduce((sum, pago) => sum + Number.parseFloat(pago.monto), 0)
 
     if (!montoCuentaCorriente || montoCuentaCorriente <= 0) {
       errors.push("El monto de cuenta corriente debe ser mayor a 0")
-      return { isValid: false, errors }
-    }
-
-    if (limiteCredito) {
-      const nuevoSaldo = saldoActual + montoCuentaCorriente
-
-      if (nuevoSaldo > limiteCredito) {
-        const disponible = limiteCredito - saldoActual
-        errors.push(
-          `El monto excede el límite de crédito disponible. Límite: ${salesService.formatCurrency(limiteCredito)}, Saldo actual: ${salesService.formatCurrency(saldoActual)}, Disponible: ${salesService.formatCurrency(disponible)}`,
-        )
-      }
-    }
-
-    if (cliente.saldo_disponible !== undefined && cliente.saldo_disponible !== 999999999) {
-      if (montoCuentaCorriente > cliente.saldo_disponible) {
-        errors.push(
-          `El monto excede el saldo disponible en cuenta corriente: ${salesService.formatCurrency(cliente.saldo_disponible)}`,
-        )
-      }
     }
 
     return {
@@ -728,7 +709,7 @@ export const useSales = (initialFilters = {}) => {
     getSalesByClient,
     prepareSaleDataFromForm,
 
-    // Validaciones
+    // Validaciones (now wrappers for salesService)
     validateSaleData,
     validateCreditSale,
 

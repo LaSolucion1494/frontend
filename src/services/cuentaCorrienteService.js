@@ -1,8 +1,7 @@
-// cuentaCorrienteService.js - SERVICIO COMPLETO Y CORREGIDO
 import { apiClient } from "../config/api"
 
 export const cuentaCorrienteService = {
-  // Obtener resumen general de cuentas corrientes
+  // Obtener resumen general de cuentas corrientes CON PAGINACIÓN
   async getResumen(filters = {}) {
     try {
       const params = new URLSearchParams()
@@ -14,13 +13,23 @@ export const cuentaCorrienteService = {
       })
 
       const response = await apiClient.get(`/cuenta-corriente?${params.toString()}`)
-      return { success: true, data: response.data }
+
+      if (response.data.success !== undefined) {
+        return {
+          success: response.data.success,
+          data: response.data.data,
+          pagination: response.data.pagination || null,
+        }
+      } else {
+        return { success: true, data: response.data, pagination: null }
+      }
     } catch (error) {
       return {
         success: false,
         message: error.response?.data?.message || "Error al obtener resumen de cuenta corriente",
         error: error.response?.data,
         data: null,
+        pagination: null,
       }
     }
   },
@@ -28,22 +37,29 @@ export const cuentaCorrienteService = {
   // Registrar un pago de cuenta corriente
   async registrarPago(pagoData) {
     try {
-      // Formatear datos para el backend
       const formattedData = {
         cliente_id: pagoData.cliente_id,
         monto: Number.parseFloat(pagoData.monto),
-        fecha_pago: pagoData.fecha || new Date().toISOString().split("T")[0],
+        fecha_pago: pagoData.fecha_pago || new Date().toISOString().split("T")[0],
         comprobante: pagoData.comprobante || "",
         notas: pagoData.notas || "",
       }
       const response = await apiClient.post("/cuenta-corriente/pagos", formattedData)
-      return {
-        success: true,
-        data: response.data.data,
-        message: "Pago registrado exitosamente",
+
+      if (response.data.success !== undefined) {
+        return {
+          success: response.data.success,
+          data: response.data.data,
+          message: response.data.message || "Pago registrado exitosamente",
+        }
+      } else {
+        return {
+          success: true,
+          data: response.data.data,
+          message: "Pago registrado exitosamente",
+        }
       }
     } catch (error) {
-      console.error("Error al registrar pago:", error)
       return {
         success: false,
         message: error.response?.data?.message || error.message || "Error al registrar pago",
@@ -52,7 +68,7 @@ export const cuentaCorrienteService = {
     }
   },
 
-  // Obtener todos los pagos con filtros
+  // Obtener todos los pagos con filtros Y PAGINACIÓN
   async getPagos(filters = {}) {
     try {
       const params = new URLSearchParams()
@@ -64,18 +80,28 @@ export const cuentaCorrienteService = {
       })
 
       const response = await apiClient.get(`/cuenta-corriente/pagos?${params.toString()}`)
-      return { success: true, data: response.data }
+
+      if (response.data.success !== undefined) {
+        return {
+          success: response.data.success,
+          data: response.data.data,
+          pagination: response.data.pagination || null,
+        }
+      } else {
+        return { success: true, data: response.data, pagination: null }
+      }
     } catch (error) {
       return {
         success: false,
         message: error.response?.data?.message || "Error al obtener pagos",
         error: error.response?.data,
         data: [],
+        pagination: null,
       }
     }
   },
 
-  // Obtener pagos de un cliente específico
+  // Obtener pagos de un cliente específico CON PAGINACIÓN
   async getPagosByClient(clientId, filters = {}) {
     try {
       const params = new URLSearchParams()
@@ -87,18 +113,28 @@ export const cuentaCorrienteService = {
       })
 
       const response = await apiClient.get(`/cuenta-corriente/client/${clientId}/pagos?${params.toString()}`)
-      return { success: true, data: response.data }
+
+      if (response.data.success !== undefined) {
+        return {
+          success: response.data.success,
+          data: response.data.data,
+          pagination: response.data.pagination || null,
+        }
+      } else {
+        return { success: true, data: response.data, pagination: null }
+      }
     } catch (error) {
       return {
         success: false,
         message: error.response?.data?.message || "Error al obtener pagos del cliente",
         error: error.response?.data,
         data: { cliente: null, pagos: [] },
+        pagination: null,
       }
     }
   },
 
-  // Obtener movimientos de cuenta corriente de un cliente
+  // Obtener movimientos de cuenta corriente de un cliente CON PAGINACIÓN
   async getMovimientosByClient(clientId, filters = {}) {
     try {
       const params = new URLSearchParams()
@@ -110,13 +146,23 @@ export const cuentaCorrienteService = {
       })
 
       const response = await apiClient.get(`/cuenta-corriente/client/${clientId}/movimientos?${params.toString()}`)
-      return { success: true, data: response.data }
+
+      if (response.data.success !== undefined) {
+        return {
+          success: response.data.success,
+          data: response.data.data,
+          pagination: response.data.pagination || null,
+        }
+      } else {
+        return { success: true, data: response.data, pagination: null }
+      }
     } catch (error) {
       return {
         success: false,
         message: error.response?.data?.message || "Error al obtener movimientos del cliente",
         error: error.response?.data,
         data: { cliente: null, movimientos: [] },
+        pagination: null,
       }
     }
   },
@@ -125,7 +171,12 @@ export const cuentaCorrienteService = {
   async getPagoById(id) {
     try {
       const response = await apiClient.get(`/cuenta-corriente/pagos/${id}`)
-      return { success: true, data: response.data }
+
+      if (response.data.success !== undefined) {
+        return { success: response.data.success, data: response.data.data }
+      } else {
+        return { success: true, data: response.data }
+      }
     } catch (error) {
       return {
         success: false,
@@ -139,10 +190,19 @@ export const cuentaCorrienteService = {
   async anularPago(id, motivo) {
     try {
       const response = await apiClient.patch(`/cuenta-corriente/pagos/${id}/anular`, { motivo })
-      return {
-        success: true,
-        data: response.data.data,
-        message: "Pago anulado exitosamente",
+
+      if (response.data.success !== undefined) {
+        return {
+          success: response.data.success,
+          data: response.data.data,
+          message: response.data.message || "Pago anulado exitosamente",
+        }
+      } else {
+        return {
+          success: true,
+          data: response.data.data,
+          message: "Pago anulado exitosamente",
+        }
       }
     } catch (error) {
       return {
@@ -153,10 +213,9 @@ export const cuentaCorrienteService = {
     }
   },
 
-  // Crear ajuste manual de cuenta corriente
+  // Crear ajuste manual
   async crearAjuste(ajusteData) {
     try {
-      // Formatear datos para el backend
       const formattedData = {
         cliente_id: ajusteData.cliente_id,
         tipo: ajusteData.tipo,
@@ -164,14 +223,23 @@ export const cuentaCorrienteService = {
         concepto: ajusteData.concepto,
         notas: ajusteData.notas || "",
       }
+
       const response = await apiClient.post("/cuenta-corriente/ajustes", formattedData)
-      return {
-        success: true,
-        data: response.data.data,
-        message: "Ajuste registrado exitosamente",
+
+      if (response.data.success !== undefined) {
+        return {
+          success: response.data.success,
+          data: response.data.data,
+          message: response.data.message || "Ajuste registrado exitosamente",
+        }
+      } else {
+        return {
+          success: true,
+          data: response.data.data,
+          message: "Ajuste registrado exitosamente",
+        }
       }
     } catch (error) {
-      console.error("Error al crear ajuste:", error)
       return {
         success: false,
         message: error.response?.data?.message || error.message || "Error al crear ajuste",
@@ -192,7 +260,12 @@ export const cuentaCorrienteService = {
       })
 
       const response = await apiClient.get(`/cuenta-corriente/stats?${params.toString()}`)
-      return { success: true, data: response.data }
+
+      if (response.data.success !== undefined) {
+        return { success: response.data.success, data: response.data.data }
+      } else {
+        return { success: true, data: response.data }
+      }
     } catch (error) {
       return {
         success: false,
@@ -211,24 +284,46 @@ export const cuentaCorrienteService = {
     }).format(amount || 0)
   },
 
-  // Formatear fecha
+  // Formatear fecha usando tiempo local
   formatDate(date) {
-    return new Date(date).toLocaleDateString("es-AR", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    })
+    if (!date) return ""
+
+    try {
+      const dateObj = new Date(date)
+      if (isNaN(dateObj.getTime())) return "Fecha inválida"
+
+      return dateObj.toLocaleDateString("es-AR", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      })
+    } catch (error) {
+      console.error("Error al formatear fecha:", error)
+      return "Error de formato"
+    }
   },
 
-  // Formatear fecha y hora
+  // Formatear fecha y hora usando tiempo local
   formatDateTime(date) {
-    return new Date(date).toLocaleDateString("es-AR", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
+    if (!date) return ""
+
+    try {
+      const dateObj = new Date(date)
+      if (isNaN(dateObj.getTime())) return "Fecha inválida"
+
+      return dateObj.toLocaleDateString("es-AR", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      })
+    } catch (error) {
+      console.error("Error al formatear fecha y hora:", error)
+      return "Error de formato"
+    }
   },
 
   // Obtener tipos de pago disponibles
@@ -241,51 +336,21 @@ export const cuentaCorrienteService = {
     ]
   },
 
-  // Obtener tipos de ajuste disponibles
+  // Obtener tipos de ajuste
   getAdjustmentTypes() {
     return [
-      { value: "debito", label: "Débito (Aumenta deuda)" },
-      { value: "credito", label: "Crédito (Reduce deuda)" },
+      {
+        value: "aumentar_saldo",
+        label: "Aumentar Saldo",
+        description: "Aumenta la deuda del cliente (ej: recargo, interés, compra)",
+        color: "red",
+      },
+      {
+        value: "disminuir_saldo",
+        label: "Disminuir Saldo",
+        description: "Disminuye la deuda del cliente (ej: descuento, bonificación)",
+        color: "green",
+      },
     ]
-  },
-
-  // Obtener estado formateado de pago
-  getEstadoPago(estado) {
-    switch (estado) {
-      case "activo":
-        return { label: "Activo", color: "green" }
-      case "anulado":
-        return { label: "Anulado", color: "red" }
-      default:
-        return { label: estado, color: "gray" }
-    }
-  },
-
-  // Obtener tipo formateado de movimiento
-  getTipoMovimiento(tipo) {
-    switch (tipo) {
-      case "debito":
-        return { label: "Débito", color: "red", description: "Aumenta la deuda" }
-      case "credito":
-        return { label: "Crédito", color: "green", description: "Reduce la deuda" }
-      default:
-        return { label: tipo, color: "gray", description: "" }
-    }
-  },
-
-  // Obtener concepto formateado de movimiento
-  getConceptoMovimiento(concepto) {
-    switch (concepto) {
-      case "venta":
-        return { label: "Venta", icon: "shopping-cart" }
-      case "pago":
-        return { label: "Pago", icon: "credit-card" }
-      case "nota_debito":
-        return { label: "Nota de Débito", icon: "file-plus" }
-      case "nota_credito":
-        return { label: "Nota de Crédito", icon: "file-minus" }
-      default:
-        return { label: concepto, icon: "file-text" }
-    }
   },
 }

@@ -1,16 +1,25 @@
 import { apiClient } from "../config/api"
 
 export const categoriesService = {
-  // Obtener todas las categorías
-  getCategories: async () => {
+  // Obtener todas las categorías con filtros y paginación
+  getCategories: async (filters = {}) => {
     try {
-      const response = await apiClient.get("/categories")
-      return { success: true, data: response.data }
+      const params = new URLSearchParams()
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          params.append(key, value)
+        }
+      })
+
+      const response = await apiClient.get(`/categories?${params.toString()}`)
+      return { success: true, data: response.data.data, pagination: response.data.pagination }
     } catch (error) {
       return {
         success: false,
         message: error.response?.data?.message || "Error al obtener categorías",
         error: error.response?.data,
+        data: [],
+        pagination: null,
       }
     }
   },

@@ -6,155 +6,54 @@ import { Badge } from "../ui/badge"
 import { Trash2, Plus, Minus } from "lucide-react"
 
 const ProductCard = ({ product, onUpdateQuantity, onRemove, onUpdatePrice, formatCurrency, config }) => {
-  // Estado para los impuestos - ahora usando config
-  const [impuestos, setImpuestos] = useState({
-    iva_activo: true,
-    ingresos_brutos_activo: true,
-    iva_porcentaje: config?.iva || 21,
-    ingresos_brutos_porcentaje: config?.ingresos_brutos || 0,
-  })
-
-  // Add a discount state to the component's state
+  // Estado simplificado - solo para descuento automático
   const [discount, setDiscount] = useState({
     active: false,
-    percentage: 0,
   })
 
   const [precioCalculado, setPrecioCalculado] = useState(product.precio_venta)
-
-  // Precio original con todos los impuestos (guardado al inicio)
   const [precioOriginal] = useState(product.precio_venta)
 
-  // Precio base sin ningún impuesto (calculado una sola vez)
-  const [precioBase, setPrecioBase] = useState(0)
+  // Calcular precio con descuento automático basado en "otros impuestos"
+  const calcularPrecioConDescuento = () => {
+    if (!discount.active || !config?.otros_impuestos) {
+      return precioOriginal
+    }
 
-  // Actualizar porcentajes cuando cambie la configuración
+    // Calcular el precio sin "otros impuestos"
+    const otrosImpuestosPorcentaje = Number.parseFloat(config.otros_impuestos) || 0
+    const precioSinOtrosImpuestos = precioOriginal / (1 + otrosImpuestosPorcentaje / 100)
+
+    return Math.round(precioSinOtrosImpuestos * 100) / 100
+  }
+
+  // Recalcular precio cuando cambia el descuento
   useEffect(() => {
-    if (config) {
-      setImpuestos((prev) => ({
-        ...prev,
-        iva_porcentaje: config.iva || 21,
-        ingresos_brutos_porcentaje: config.ingresos_brutos || 0,
-      }))
-    }
-  }, [config])
+    const nuevoPrecio = calcularPrecioConDescuento()
+    setPrecioCalculado(nuevoPrecio)
 
-  // Calcular el precio base (sin impuestos) al inicializar
-  useEffect(() => {
-    if (config) {
-      const base = calcularPrecioBase(precioOriginal, config.iva || 21, config.ingresos_brutos || 0)
-      setPrecioBase(base)
-    }
-  }, [precioOriginal, config])
-
-  // Calcular precio base (sin impuestos)
-  const calcularPrecioBase = (precioCompleto, ivaPorcentaje, ibPorcentaje) => {
-    // Primero quitamos ingresos brutos, luego IVA
-    const sinIB = precioCompleto / (1 + ibPorcentaje / 100)
-    const sinIVA = sinIB / (1 + ivaPorcentaje / 100)
-    return sinIVA
-  }
-
-  // Calcular precio final basado en toggles activos
-  const calcularPrecioFinal = () => {
-    // Siempre partimos del precio base (sin impuestos)
-    let precioFinal = precioBase
-
-    // Aplicar IVA si está activo
-    if (impuestos.iva_activo) {
-      precioFinal = precioFinal * (1 + impuestos.iva_porcentaje / 100)
-    }
-
-    // Aplicar ingresos brutos si está activo
-    if (impuestos.ingresos_brutos_activo) {
-      precioFinal = precioFinal * (1 + impuestos.ingresos_brutos_porcentaje / 100)
-    }
-
-    // Aplicar descuento si está activo
-    if (discount.active && discount.percentage > 0) {
-      precioFinal = precioFinal * (1 - discount.percentage / 100)
-    }
-
-    return Math.round(precioFinal * 100) / 100
-  }
-
-  // Recalcular precio cuando cambian los impuestos
-  useEffect(() => {
-    if (precioBase > 0) {
-      const nuevoPrecio = calcularPrecioFinal()
-      setPrecioCalculado(nuevoPrecio)
-
-      // Actualizar el precio en el carrito
-      onUpdatePrice(product.id, {
-        precio_venta: nuevoPrecio,
-        iva_activo: impuestos.iva_activo,
-        ingresos_brutos_activo: impuestos.ingresos_brutos_activo,
-        iva_porcentaje: impuestos.iva_porcentaje,
-        ingresos_brutos_porcentaje: impuestos.ingresos_brutos_porcentaje,
-        discount_active: discount.active,
-        discount_percentage: discount.percentage,
-      })
-    }
-  }, [impuestos.iva_activo, impuestos.ingresos_brutos_activo, discount.active, discount.percentage, precioBase])
-
-  const toggleIva = () => {
-    setImpuestos((prev) => ({
-      ...prev,
-      iva_activo: !prev.iva_activo,
-    }))
-  }
-
-  const toggleIngresosBrutos = () => {
-    setImpuestos((prev) => ({
-      ...prev,
-      ingresos_brutos_activo: !prev.ingresos_brutos_activo,
-    }))
-  }
+    // Actualizar el precio en el carrito
+    onUpdatePrice(product.id, {
+      precio_venta: nuevoPrecio,
+      discount_active: discount.active,
+      discount_percentage: discount.active ? config?.otros_impuestos || 0 : 0,
+    })
+  }, [discount.active, precioOriginal, config?.otros_impuestos])
 
   const toggleDiscount = () => {
     setDiscount((prev) => ({
-      ...prev,
       active: !prev.active,
     }))
   }
 
-  const updateDiscountPercentage = (e) => {
-    const value = Number.parseFloat(e.target.value) || 0
-    setDiscount((prev) => ({
-      ...prev,
-      percentage: value,
-    }))
-  }
-
-  // Manejar el foco en el campo de descuento
-  const handleDiscountFocus = (e) => {
-    // Seleccionar todo el texto cuando se enfoca
-    e.target.select()
-  }
-
-  // Calcular montos de impuestos para mostrar
-  const calcularMontoIva = () => {
-    const precioSinIva =
-      precioBase * (impuestos.ingresos_brutos_activo ? 1 + impuestos.ingresos_brutos_porcentaje / 100 : 1)
-    return precioSinIva * (impuestos.iva_porcentaje / 100)
-  }
-
-  const calcularMontoIB = () => {
-    return precioBase * (impuestos.ingresos_brutos_porcentaje / 100)
-  }
-
+  // Calcular el monto del descuento para mostrar
   const calcularMontoDescuento = () => {
-    let precioSinDescuento = precioBase
-
-    if (impuestos.iva_activo) {
-      precioSinDescuento = precioSinDescuento * (1 + impuestos.iva_porcentaje / 100)
+    if (!discount.active || !config?.otros_impuestos) {
+      return 0
     }
 
-    if (impuestos.ingresos_brutos_activo) {
-      precioSinDescuento = precioSinDescuento * (1 + impuestos.ingresos_brutos_porcentaje / 100)
-    }
-
-    return discount.active && discount.percentage > 0 ? precioSinDescuento * (discount.percentage / 100) : 0
+    const otrosImpuestosPorcentaje = Number.parseFloat(config.otros_impuestos) || 0
+    return precioOriginal - precioCalculado
   }
 
   return (
@@ -208,32 +107,8 @@ const ProductCard = ({ product, onUpdateQuantity, onRemove, onUpdatePrice, forma
               </div>
             </div>
 
-            {/* Badges de impuestos clickeables */}
+            {/* Toggle de descuento automático */}
             <div className="flex items-center space-x-2 mb-3">
-              <Badge
-                variant="outline"
-                className={`text-xs cursor-pointer transition-all duration-200 select-none ${
-                  impuestos.iva_activo
-                    ? "bg-slate-800 text-white border-slate-800 hover:bg-slate-700 shadow-sm"
-                    : "bg-gray-200 text-gray-600 border-gray-300 hover:bg-gray-300"
-                }`}
-                onClick={toggleIva}
-              >
-                IVA {impuestos.iva_porcentaje}%
-              </Badge>
-
-              <Badge
-                variant="outline"
-                className={`text-xs cursor-pointer transition-all duration-200 select-none ${
-                  impuestos.ingresos_brutos_activo
-                    ? "bg-slate-800 text-white border-slate-800 hover:bg-slate-700 shadow-sm"
-                    : "bg-gray-200 text-gray-600 border-gray-300 hover:bg-gray-300"
-                }`}
-                onClick={toggleIngresosBrutos}
-              >
-                I.B. {impuestos.ingresos_brutos_porcentaje}%
-              </Badge>
-
               <Badge
                 variant="outline"
                 className={`text-xs cursor-pointer transition-all duration-200 select-none ${
@@ -243,27 +118,15 @@ const ProductCard = ({ product, onUpdateQuantity, onRemove, onUpdatePrice, forma
                 }`}
                 onClick={toggleDiscount}
               >
-                Descuento
+                Descuento {config?.otros_impuestos ? `(${config.otros_impuestos}%)` : ""}
               </Badge>
 
               {discount.active && (
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    value={discount.percentage}
-                    onChange={updateDiscountPercentage}
-                    onFocus={handleDiscountFocus}
-                    className="w-12 h-6 text-xs border border-gray-300 rounded px-1"
-                  />
-                  <span className="text-xs ml-1">%</span>
-                </div>
+                <span className="text-xs text-green-600 font-medium">Precio sin otros impuestos</span>
               )}
             </div>
 
-            {/* Información de precio */}
+            {/* Información de precio simplificada */}
             <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
               <div className="space-y-2">
                 {/* Precio unitario */}
@@ -272,34 +135,19 @@ const ProductCard = ({ product, onUpdateQuantity, onRemove, onUpdatePrice, forma
                   <div className="text-lg font-bold text-gray-900">{formatCurrency(precioCalculado)}</div>
                 </div>
 
-                {/* Desglose de impuestos */}
-                <div className="text-xs text-gray-500 space-y-1 pt-1 border-t border-gray-200">
-                  <div className="flex justify-between">
-                    <span>Precio base:</span>
-                    <span>{formatCurrency(precioBase)}</span>
-                  </div>
-
-                  {impuestos.iva_activo && (
-                    <div className="flex justify-between text-blue-600">
-                      <span>+ IVA ({impuestos.iva_porcentaje}%):</span>
-                      <span>+{formatCurrency(calcularMontoIva())}</span>
+                {/* Mostrar descuento aplicado si está activo */}
+                {discount.active && calcularMontoDescuento() > 0 && (
+                  <div className="text-xs text-gray-500 space-y-1 pt-1 border-t border-gray-200">
+                    <div className="flex justify-between">
+                      <span>Precio original:</span>
+                      <span>{formatCurrency(precioOriginal)}</span>
                     </div>
-                  )}
-
-                  {impuestos.ingresos_brutos_activo && impuestos.ingresos_brutos_porcentaje > 0 && (
-                    <div className="flex justify-between text-purple-600">
-                      <span>+ I.B. ({impuestos.ingresos_brutos_porcentaje}%):</span>
-                      <span>+{formatCurrency(calcularMontoIB())}</span>
-                    </div>
-                  )}
-
-                  {discount.active && discount.percentage > 0 && (
                     <div className="flex justify-between text-green-600">
-                      <span>- Descuento ({discount.percentage}%):</span>
+                      <span>- Descuento aplicado:</span>
                       <span>-{formatCurrency(calcularMontoDescuento())}</span>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Total por cantidad */}
                 <div className="flex items-center justify-between pt-2 border-t border-gray-200">

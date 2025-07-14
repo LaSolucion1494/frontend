@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react"
+import { useNavigate } from "react-router-dom"
 import Layout from "../components/Layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card"
 import { Button } from "../components/ui/button"
@@ -24,6 +25,9 @@ import {
   Layers,
   ScanLine,
   FilterX,
+  ChevronUp,
+  ChevronDown,
+  History,
 } from "lucide-react"
 import { formatCurrency } from "../lib/utils"
 import ProductModal from "../components/stock/ProductModal"
@@ -39,6 +43,7 @@ import { useConfig } from "../hooks/useConfig"
 import { useStockMovements } from "../hooks/useStockMovements"
 import { toast } from "react-toastify"
 import { NumericFormat } from "react-number-format"
+import Pagination from "../components/ui/Pagination"
 
 const STOCK_STATUS = [
   { value: "todos", label: "Todos los productos" },
@@ -55,6 +60,7 @@ const SORT_OPTIONS = [
 ]
 
 const Stock = () => {
+  const navigate = useNavigate()
   // Estados locales para filtros y UI
   const [searchByCode, setSearchByCode] = useState("")
   const [searchByNameBrand, setSearchByNameBrand] = useState("")
@@ -71,6 +77,7 @@ const Stock = () => {
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false)
   const [selectedProductForBarcode, setSelectedProductForBarcode] = useState(null)
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  const [showFilterCard, setShowFilterCard] = useState(false)
 
   // Estados para el modal de eliminación
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
@@ -89,6 +96,7 @@ const Stock = () => {
   const {
     products,
     loading: productsLoading,
+    pagination,
     sortConfig,
     createProduct,
     updateProduct,
@@ -97,10 +105,12 @@ const Stock = () => {
     fetchProducts,
     updateSorting,
     resetSorting,
+    updateFilters,
+    handlePageChange,
   } = useProducts()
   const { categories, loading: categoriesLoading } = useCategories()
-  const { config, loading: configLoading } = useConfig()
-  const { createStockMovements } = useStockMovements()
+  const { config, } = useConfig()
+  const { createStockMovement } = useStockMovements()
 
   // Debounce para búsquedas de texto
   useEffect(() => {
@@ -126,50 +136,30 @@ const Stock = () => {
     return categoryNames
   }, [categories])
 
-  // Construir filtros para enviar al backend
-  const buildFilters = useMemo(() => {
-    const backendFilters = {
-      sortBy: sortConfig.sortBy,
-      sortOrder: sortConfig.sortOrder,
-    }
-
-    // Combinar búsquedas en un solo campo 'search'
+  // Efecto para actualizar filtros cuando cambien las búsquedas con debounce
+  useEffect(() => {
     const searchTerms = []
     if (debouncedSearchCode.trim()) searchTerms.push(debouncedSearchCode.trim())
     if (debouncedSearchNameBrand.trim()) searchTerms.push(debouncedSearchNameBrand.trim())
-    if (searchTerms.length > 0) {
-      backendFilters.search = searchTerms.join(" ")
+
+    const newFilters = {
+      search: searchTerms.length > 0 ? searchTerms.join(" ") : "",
+      categoria: selectedCategory !== "Todos" ? selectedCategory : "",
+      stockStatus: selectedStockStatus,
+      minPrice: appliedPriceRange.min || "",
+      maxPrice: appliedPriceRange.max || "",
+      offset: 0, // Reset offset cuando cambian filtros
     }
 
-    // Otros filtros
-    if (selectedCategory !== "Todos") {
-      backendFilters.categoria = selectedCategory
-    }
-    if (selectedStockStatus !== "todos") {
-      backendFilters.stockStatus = selectedStockStatus
-    }
-    if (appliedPriceRange.min) {
-      backendFilters.minPrice = appliedPriceRange.min
-    }
-    if (appliedPriceRange.max) {
-      backendFilters.maxPrice = appliedPriceRange.max
-    }
-
-    return backendFilters
+    updateFilters(newFilters)
   }, [
     debouncedSearchCode,
     debouncedSearchNameBrand,
     selectedCategory,
     selectedStockStatus,
     appliedPriceRange,
-    sortConfig.sortBy,
-    sortConfig.sortOrder,
+    updateFilters,
   ])
-
-  // Efecto para actualizar productos cuando cambien los filtros
-  useEffect(() => {
-    fetchProducts(buildFilters)
-  }, [buildFilters, fetchProducts])
 
   const handleAddProduct = () => {
     setSelectedProduct(null)
@@ -193,8 +183,6 @@ const Stock = () => {
     if (result.success) {
       setIsDeleteModalOpen(false)
       setProductToDelete(null)
-      // Recargar productos después de eliminar
-      fetchProducts(buildFilters)
     }
   }
 
@@ -218,8 +206,6 @@ const Stock = () => {
 
     if (result.success) {
       setIsProductModalOpen(false)
-      // Recargar productos después de guardar
-      fetchProducts(buildFilters)
     }
   }
 
@@ -232,12 +218,12 @@ const Stock = () => {
       notas: movement.notes || "",
     }
 
-    const result = await createStockMovements(movementData)
+    const result = await createStockMovement(movementData)
 
     if (result.success) {
       setIsStockMovementModalOpen(false)
-      // Recargar productos para obtener el stock actualizado
-      fetchProducts(buildFilters)
+      // Refrescar productos para obtener el stock actualizado
+      fetchProducts({ offset: 0 })
     }
   }
 
@@ -321,7 +307,7 @@ const Stock = () => {
   }
 
   const handleRefresh = () => {
-    fetchProducts(buildFilters)
+    fetchProducts({ offset: 0 })
   }
 
   // Función para cambiar el ordenamiento
@@ -398,7 +384,20 @@ const Stock = () => {
                   Administra tu inventario, controla stock y gestiona precios de productos
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
+                <Button onClick={() => setShowFilterCard(!showFilterCard)} variant="outline" disabled={productsLoading}>
+                  <Filter className="w-4 h-4 mr-2" />
+                  {showFilterCard ? "Ocultar Filtros" : "Mostrar Filtros"}
+                  {showFilterCard ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}
+                </Button>
+                <Button
+                  onClick={() => navigate("/reportes/historial-movimientos")}
+                  variant="outline"
+                  disabled={productsLoading}
+                >
+                  <History className="w-4 h-4 mr-2" />
+                  Historial de Movimientos
+                </Button>
                 <Button onClick={handleRefresh} variant="outline" disabled={productsLoading}>
                   <RefreshCw className={`w-4 h-4 mr-2 ${productsLoading ? "animate-spin" : ""}`} />
                   Actualizar
@@ -416,292 +415,312 @@ const Stock = () => {
           </div>
 
           {/* Filtros y búsqueda */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Search className="w-5 h-5" />
-                Búsqueda y Filtros
-              </CardTitle>
-              <CardDescription>Busca productos por código (compatible con escáner) o por nombre/marca</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {/* Búsquedas principales */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Input para búsqueda por código */}
-                  <div className="space-y-2">
-                    <Label htmlFor="searchCode">Buscar por código</Label>
-                    <div className="relative">
-                      <ScanLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                      <Input
-                        ref={searchCodeInputRef}
-                        id="searchCode"
-                        placeholder="Código del producto..."
-                        value={searchByCode}
-                        onChange={handleCodeSearchChange}
-                        onKeyDown={async (e) => {
-                          if (e.key === "Enter" && searchByCode.length > 0) {
-                            try {
-                              const result = await getProductByCode(searchByCode)
-                              if (result.success) {
-                                toast.success(`Producto encontrado: ${result.data.nombre}`)
-                              }
-                            } catch {
-                              toast.error("No existe ese código")
-                            }
-                          }
-                        }}
-                        className="pl-10 pr-10 border-slate-800"
-                        autoComplete="off"
-                      />
-                      {searchByCode && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
-                          onClick={clearCodeSearch}
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Input para búsqueda por nombre/marca */}
-                  <div className="space-y-2">
-                    <Label htmlFor="searchNameBrand">Buscar por nombre/marca</Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                      <Input
-                        ref={searchNameBrandInputRef}
-                        id="searchNameBrand"
-                        placeholder="Nombre, marca, descripción..."
-                        value={searchByNameBrand}
-                        onChange={handleNameBrandSearchChange}
-                        className="pl-10 pr-10 border-slate-800"
-                        autoComplete="off"
-                      />
-                      {searchByNameBrand && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
-                          onClick={clearNameBrandSearch}
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Categoría</Label>
-                    <Select value={selectedCategory} onValueChange={setSelectedCategory} disabled={categoriesLoading}>
-                      <SelectTrigger className="border-slate-800">
-                        <SelectValue placeholder="Seleccionar categoría" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categoryOptions.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="stockStatus">Estado de Stock</Label>
-                    <Select value={selectedStockStatus} onValueChange={setSelectedStockStatus}>
-                      <SelectTrigger className="border-slate-800">
-                        <SelectValue placeholder="Estado de stock" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STOCK_STATUS.map((status) => (
-                          <SelectItem key={status.value} value={status.value}>
-                            {status.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Filtros avanzados */}
-                <div className="flex items-center gap-2">
+          {showFilterCard && (
+            <Card className="mb-6">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Search className="w-5 h-5" />
+                    Búsqueda y Filtros
+                  </CardTitle>
                   <Button
-                    className="border-slate-800"
-                    variant="outline"
-                    size="sm"
                     onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:bg-muted"
+                    title={showAdvancedFilters ? "Ocultar filtros avanzados" : "Mostrar filtros avanzados"}
                   >
-                    <Filter className="w-4 h-4 mr-2" />
-                    Filtros avanzados
+                    {showAdvancedFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    <span className="sr-only">
+                      {showAdvancedFilters ? "Ocultar filtros avanzados" : "Mostrar filtros avanzados"}
+                    </span>
                   </Button>
+                </div>
+                <CardDescription>
+                  Busca productos por código (compatible con escáner) o por nombre/marca
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Búsquedas principales */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Input para búsqueda por código */}
+                    <div className="space-y-2">
+                      <Label htmlFor="searchCode">Buscar por código</Label>
+                      <div className="relative">
+                        <ScanLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                        <Input
+                          ref={searchCodeInputRef}
+                          id="searchCode"
+                          placeholder="Código del producto..."
+                          value={searchByCode}
+                          onChange={handleCodeSearchChange}
+                          onKeyDown={async (e) => {
+                            if (e.key === "Enter" && searchByCode.length > 0) {
+                              try {
+                                const result = await getProductByCode(searchByCode)
+                                if (result.success) {
+                                  toast.success(`Producto encontrado: ${result.data.nombre}`)
+                                }
+                              } catch {
+                                toast.error("No existe ese código")
+                              }
+                            }
+                          }}
+                          className="pl-10 pr-10 border-slate-800"
+                          autoComplete="off"
+                        />
+                        {searchByCode && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                            onClick={clearCodeSearch}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Input para búsqueda por nombre/marca */}
+                    <div className="space-y-2">
+                      <Label htmlFor="searchNameBrand">Buscar por nombre/marca</Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                        <Input
+                          ref={searchNameBrandInputRef}
+                          id="searchNameBrand"
+                          placeholder="Nombre, marca, descripción..."
+                          value={searchByNameBrand}
+                          onChange={handleNameBrandSearchChange}
+                          className="pl-10 pr-10 border-slate-800"
+                          autoComplete="off"
+                        />
+                        {searchByNameBrand && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                            onClick={clearNameBrandSearch}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Categoría</Label>
+                      <Select value={selectedCategory} onValueChange={setSelectedCategory} disabled={categoriesLoading}>
+                        <SelectTrigger className="border-slate-800">
+                          <SelectValue placeholder="Seleccionar categoría" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categoryOptions.map((category) => (
+                            <SelectItem key={category} value={category}>
+                              {category}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="stockStatus">Estado de Stock</Label>
+                      <Select value={selectedStockStatus} onValueChange={setSelectedStockStatus}>
+                        <SelectTrigger className="border-slate-800">
+                          <SelectValue placeholder="Estado de stock" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STOCK_STATUS.map((status) => (
+                            <SelectItem key={status.value} value={status.value}>
+                              {status.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Filtros avanzados */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      className="border-slate-800 bg-transparent"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                    >
+                      <Filter className="w-4 h-4 mr-2" />
+                      Filtros avanzados
+                    </Button>
+                    {(debouncedSearchCode ||
+                      debouncedSearchNameBrand ||
+                      selectedCategory !== "Todos" ||
+                      selectedStockStatus !== "todos" ||
+                      appliedPriceRange.min ||
+                      appliedPriceRange.max) && (
+                      <Button variant="ghost" size="sm" onClick={clearFilters}>
+                        <X className="w-4 h-4 mr-2" />
+                        Limpiar filtros
+                      </Button>
+                    )}
+                  </div>
+
+                  {showAdvancedFilters && (
+                    <div className="border-t pt-4 space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="sortBy">Ordenar por</Label>
+                          <Select value={sortConfig.sortBy} onValueChange={handleSortByChange}>
+                            <SelectTrigger className="border-slate-800">
+                              <SelectValue placeholder="Ordenar por" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {SORT_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="priceMin">Precio mínimo</Label>
+                          <NumericFormat
+                            id="priceMin"
+                            value={priceRange.min || ""}
+                            onValueChange={handleMinPriceChange}
+                            onKeyDown={handlePriceKeyDown}
+                            onBlur={handlePriceBlur}
+                            thousandSeparator="."
+                            decimalSeparator=","
+                            prefix="$ "
+                            decimalScale={2}
+                            fixedDecimalScale={false}
+                            allowNegative={false}
+                            placeholder="$ 0"
+                            className="flex w-full rounded-md border px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-slate-800"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="priceMax">Precio máximo</Label>
+                          <NumericFormat
+                            id="priceMax"
+                            value={priceRange.max || ""}
+                            onValueChange={handleMaxPriceChange}
+                            onKeyDown={handlePriceKeyDown}
+                            onBlur={handlePriceBlur}
+                            thousandSeparator="."
+                            decimalSeparator=","
+                            prefix="$ "
+                            decimalScale={2}
+                            fixedDecimalScale={false}
+                            allowNegative={false}
+                            placeholder="$ 999.999"
+                            className="flex w-full rounded-md border px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-slate-800"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>&nbsp;</Label>
+                          <Button
+                            onClick={applyPriceFilters}
+                            disabled={!hasPendingPriceChanges}
+                            className="w-full bg-slate-800 hover:bg-slate-700 disabled:opacity-50"
+                            size="sm"
+                          >
+                            <FilterX className="w-4 h-4 mr-2" />
+                            Aplicar Precios
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Indicador de cambios pendientes */}
+                      {hasPendingPriceChanges && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                          <div className="flex items-center gap-2 text-amber-800">
+                            <AlertTriangle className="w-4 h-4" />
+                            <span className="text-sm font-medium">
+                              Hay cambios pendientes en los filtros de precio.
+                            </span>
+                          </div>
+                          <p className="text-xs text-amber-700 mt-1">
+                            Presiona Enter, sal del campo o haz clic en "Aplicar Precios" para aplicar los filtros.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Filtros activos */}
                   {(debouncedSearchCode ||
                     debouncedSearchNameBrand ||
                     selectedCategory !== "Todos" ||
                     selectedStockStatus !== "todos" ||
                     appliedPriceRange.min ||
                     appliedPriceRange.max) && (
-                    <Button variant="ghost" size="sm" onClick={clearFilters}>
-                      <X className="w-4 h-4 mr-2" />
-                      Limpiar filtros
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {debouncedSearchCode && (
+                        <Badge variant="secondary" className="flex items-center gap-1 bg-blue-100 text-blue-800">
+                          <ScanLine className="w-3 h-3" />
+                          Código: "{debouncedSearchCode}"
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-4 w-4 p-0 ml-1"
+                            onClick={clearCodeSearch}
+                          >
+                            <X className="w-2 h-2" />
+                          </Button>
+                        </Badge>
+                      )}
+                      {debouncedSearchNameBrand && (
+                        <Badge variant="secondary" className="flex items-center gap-1 bg-green-100 text-green-800">
+                          <Search className="w-3 h-3" />
+                          Nombre/Marca: "{debouncedSearchNameBrand}"
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-4 w-4 p-0 ml-1"
+                            onClick={clearNameBrandSearch}
+                          >
+                            <X className="w-2 h-2" />
+                          </Button>
+                        </Badge>
+                      )}
+                      {selectedCategory !== "Todos" && (
+                        <Badge variant="secondary" className="flex items-center gap-1">
+                          <Layers className="w-3 h-3" />
+                          Categoría: {selectedCategory}
+                        </Badge>
+                      )}
+                      {selectedStockStatus !== "todos" && (
+                        <Badge variant="secondary" className="flex items-center gap-1">
+                          <Package className="w-3 h-3" />
+                          Estado: {STOCK_STATUS.find((s) => s.value === selectedStockStatus)?.label}
+                        </Badge>
+                      )}
+                      {(appliedPriceRange.min || appliedPriceRange.max) && (
+                        <Badge variant="secondary" className="flex items-center gap-1">
+                          <span>
+                            Precio: {appliedPriceRange.min ? formatCurrency(appliedPriceRange.min) : "$ 0"} -{" "}
+                            {appliedPriceRange.max ? formatCurrency(appliedPriceRange.max) : "∞"}
+                          </span>
+                        </Badge>
+                      )}
+                    </div>
                   )}
                 </div>
-
-                {showAdvancedFilters && (
-                  <div className="border-t pt-4 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="sortBy">Ordenar por</Label>
-                        <Select value={sortConfig.sortBy} onValueChange={handleSortByChange}>
-                          <SelectTrigger className="border-slate-800">
-                            <SelectValue placeholder="Ordenar por" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {SORT_OPTIONS.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="priceMin">Precio mínimo</Label>
-                        <NumericFormat
-                          id="priceMin"
-                          value={priceRange.min || ""}
-                          onValueChange={handleMinPriceChange}
-                          onKeyDown={handlePriceKeyDown}
-                          onBlur={handlePriceBlur}
-                          thousandSeparator="."
-                          decimalSeparator=","
-                          prefix="$ "
-                          decimalScale={2}
-                          fixedDecimalScale={false}
-                          allowNegative={false}
-                          placeholder="$ 0"
-                          className="flex w-full rounded-md border px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-slate-800"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="priceMax">Precio máximo</Label>
-                        <NumericFormat
-                          id="priceMax"
-                          value={priceRange.max || ""}
-                          onValueChange={handleMaxPriceChange}
-                          onKeyDown={handlePriceKeyDown}
-                          onBlur={handlePriceBlur}
-                          thousandSeparator="."
-                          decimalSeparator=","
-                          prefix="$ "
-                          decimalScale={2}
-                          fixedDecimalScale={false}
-                          allowNegative={false}
-                          placeholder="$ 999.999"
-                          className="flex w-full rounded-md border px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-slate-800"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>&nbsp;</Label>
-                        <Button
-                          onClick={applyPriceFilters}
-                          disabled={!hasPendingPriceChanges}
-                          className="w-full bg-slate-800 hover:bg-slate-700 disabled:opacity-50"
-                          size="sm"
-                        >
-                          <FilterX className="w-4 h-4 mr-2" />
-                          Aplicar Precios
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Indicador de cambios pendientes */}
-                    {hasPendingPriceChanges && (
-                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                        <div className="flex items-center gap-2 text-amber-800">
-                          <AlertTriangle className="w-4 h-4" />
-                          <span className="text-sm font-medium">Hay cambios pendientes en los filtros de precio.</span>
-                        </div>
-                        <p className="text-xs text-amber-700 mt-1">
-                          Presiona Enter, sal del campo o haz clic en "Aplicar Precios" para aplicar los filtros.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Filtros activos */}
-                {(debouncedSearchCode ||
-                  debouncedSearchNameBrand ||
-                  selectedCategory !== "Todos" ||
-                  selectedStockStatus !== "todos" ||
-                  appliedPriceRange.min ||
-                  appliedPriceRange.max) && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    {debouncedSearchCode && (
-                      <Badge variant="secondary" className="flex items-center gap-1 bg-blue-100 text-blue-800">
-                        <ScanLine className="w-3 h-3" />
-                        Código: "{debouncedSearchCode}"
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-4 w-4 p-0 ml-1"
-                          onClick={clearCodeSearch}
-                        >
-                          <X className="w-2 h-2" />
-                        </Button>
-                      </Badge>
-                    )}
-                    {debouncedSearchNameBrand && (
-                      <Badge variant="secondary" className="flex items-center gap-1 bg-green-100 text-green-800">
-                        <Search className="w-3 h-3" />
-                        Nombre/Marca: "{debouncedSearchNameBrand}"
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-4 w-4 p-0 ml-1"
-                          onClick={clearNameBrandSearch}
-                        >
-                          <X className="w-2 h-2" />
-                        </Button>
-                      </Badge>
-                    )}
-                    {selectedCategory !== "Todos" && (
-                      <Badge variant="secondary" className="flex items-center gap-1">
-                        <Layers className="w-3 h-3" />
-                        Categoría: {selectedCategory}
-                      </Badge>
-                    )}
-                    {selectedStockStatus !== "todos" && (
-                      <Badge variant="secondary" className="flex items-center gap-1">
-                        <Package className="w-3 h-3" />
-                        Estado: {STOCK_STATUS.find((s) => s.value === selectedStockStatus)?.label}
-                      </Badge>
-                    )}
-                    {(appliedPriceRange.min || appliedPriceRange.max) && (
-                      <Badge variant="secondary" className="flex items-center gap-1">
-                        <span>
-                          Precio: {appliedPriceRange.min ? formatCurrency(appliedPriceRange.min) : "$ 0"} -{" "}
-                          {appliedPriceRange.max ? formatCurrency(appliedPriceRange.max) : "∞"}
-                        </span>
-                      </Badge>
-                    )}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Tabla de productos */}
           <Card>
@@ -713,8 +732,8 @@ const Stock = () => {
                     Lista de Productos
                   </CardTitle>
                   <CardDescription>
-                    {products.length} producto{products.length !== 1 ? "s" : ""} encontrado
-                    {products.length !== 1 ? "s" : ""}
+                    {pagination.totalItems} producto{pagination.totalItems !== 1 ? "s" : ""} encontrado
+                    {pagination.totalItems !== 1 ? "s" : ""}
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
@@ -725,7 +744,7 @@ const Stock = () => {
                     variant="outline"
                     size="sm"
                     onClick={handleSortOrderToggle}
-                    className="flex items-center gap-1 border-slate-800"
+                    className="flex items-center gap-1 border-slate-800 bg-transparent"
                   >
                     {sortConfig.sortOrder === "asc" ? (
                       <>
@@ -740,14 +759,14 @@ const Stock = () => {
                     )}
                   </Button>
                   <Badge variant="outline" className="w-fit">
-                    Total: {products.length}
+                    Total: {pagination.totalItems}
                   </Badge>
                 </div>
               </div>
             </CardHeader>
 
             <CardContent className="-mt-3">
-              <LoadingOverlay loading={productsLoading} text="Cargando productos...">
+              <LoadingOverlay loading={productsLoading && products.length > 0} text="Actualizando productos...">
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-slate-800">
@@ -814,7 +833,7 @@ const Stock = () => {
 
                             <td className="py-3 px-4">
                               <Badge variant="secondary" className="text-xs">
-                                {product.categoria}
+                                {product.categoria_nombre}
                               </Badge>
                             </td>
 
@@ -918,6 +937,15 @@ const Stock = () => {
                   )}
                 </div>
               </LoadingOverlay>
+
+              {/* Componente de paginación */}
+              <Pagination
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                onPageChange={handlePageChange}
+                totalItems={pagination.totalItems}
+                itemsPerPage={pagination.itemsPerPage}
+              />
             </CardContent>
           </Card>
 
@@ -966,7 +994,7 @@ const Stock = () => {
         </div>
       </div>
     </Layout>
-  ) 
+  )
 }
 
 export default Stock

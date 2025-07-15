@@ -40,11 +40,11 @@ export const useSalesReports = (initialFilters = {}) => {
         const result = await salesService.getSales(finalFilters)
 
         if (result.success) {
-          // Procesar cada venta para obtener información de pagos
-          const salesWithPayments = await Promise.all(
+          // Procesar cada venta para obtener información de pagos y detalles completos
+          const salesWithDetails = await Promise.all(
             result.data.map(async (sale) => {
               try {
-                // Obtener detalles completos de la venta incluyendo pagos
+                // Obtener detalles completos de la venta incluyendo pagos y detalles de productos
                 const detailResult = await salesService.getSaleById(sale.id)
                 if (detailResult.success) {
                   return {
@@ -69,12 +69,12 @@ export const useSalesReports = (initialFilters = {}) => {
             }),
           )
 
-          console.log("Sales with payments loaded:", salesWithPayments.length)
-          setSales(salesWithPayments)
+          console.log("Sales with details loaded:", salesWithDetails.length)
+          setSales(salesWithDetails)
           if (result.pagination) {
             setPagination(result.pagination)
           }
-          return { success: true, data: salesWithPayments }
+          return { success: true, data: salesWithDetails }
         } else {
           console.error("Error from salesService:", result.message)
           setError(result.message)

@@ -95,8 +95,9 @@ export const salesService = {
         totalVentas: statsData.estadisticas_generales?.total_ventas || 0,
         montoTotal: statsData.estadisticas_generales?.total_facturado || 0,
         promedioVenta: statsData.estadisticas_generales?.promedio_venta || 0,
-        ventasCompletadas: statsData.estadisticas_generales?.total_ventas || 0,
-        ventasAnuladas: 0,
+        ventasCompletadas: statsData.estadisticas_generales?.ventas_completadas || 0,
+        ventasAnuladas: statsData.estadisticas_generales?.ventas_anuladas || 0,
+        ventasPendientes: statsData.estadisticas_generales?.ventas_pendientes || 0,
         ventasCuentaCorriente: statsData.estadisticas_generales?.ventas_cuenta_corriente || 0,
         totalCuentaCorriente: statsData.estadisticas_generales?.total_cuenta_corriente || 0,
         ventas_por_dia: statsData.ventas_por_dia || [],
@@ -235,6 +236,27 @@ export const salesService = {
       return {
         success: false,
         message: error.response?.data?.message || "Error al anular venta",
+        error: error.response?.data,
+      }
+    }
+  },
+
+  // NUEVO: Entregar productos de una venta pendiente
+  async deliverProducts(saleId, deliveries) {
+    try {
+      console.log("salesService.deliverProducts called:", { saleId, deliveries })
+      const response = await apiClient.patch(`/sales/${saleId}/deliver`, { deliveries })
+      console.log("Deliver products response:", response.data)
+      return {
+        success: true,
+        data: response.data,
+        message: response.data.message || "Productos entregados exitosamente",
+      }
+    } catch (error) {
+      console.error("Error in salesService.deliverProducts:", error)
+      return {
+        success: false,
+        message: error.response?.data?.message || "Error al entregar productos",
         error: error.response?.data,
       }
     }

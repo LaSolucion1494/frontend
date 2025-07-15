@@ -35,9 +35,11 @@ import {
   PieChart,
   ExternalLink,
   Trash2,
+  Truck,
 } from "lucide-react"
 import SaleDetailsModal from "../components/reportes-ventas/SaleDetailsModal"
 import CancelSaleModal from "../components/reportes-ventas/CancelSaleModal"
+import DeliverProductsModal from "../components/sales/DeliverProductsModal" // Importar el nuevo modal
 import { useSalesReports } from "../hooks/useSalesReports"
 import { formatCurrency } from "../lib/utils"
 import { extractExactDateTime } from "../lib/date-utils"
@@ -45,6 +47,7 @@ import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert"
 import { useNavigate } from "react-router-dom"
 import Pagination from "../components/ui/Pagination"
 import { Loading, LoadingOverlay } from "../components/ui/loading"
+import { toast } from "react-toastify" // Importar toast para mostrar mensajes
 
 const ReporteVentas = () => {
   const navigate = useNavigate()
@@ -52,6 +55,7 @@ const ReporteVentas = () => {
   const [selectedSale, setSelectedSale] = useState(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
+  const [isDeliverModalOpen, setIsDeliverModalOpen] = useState(false) // Nuevo estado para el modal de entrega
   const [showFilterCard, setShowFilterCard] = useState(false)
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [activeTab, setActiveTab] = useState("historial")
@@ -84,10 +88,6 @@ const ReporteVentas = () => {
 
     updateFilters(initialFilters)
   }, [updateFilters])
-
-  const handleApplyFilters = async () => {
-    await Promise.all([fetchSales({ offset: 0 }), fetchStats()])
-  }
 
   const handleFilterChange = (field, value) => {
     const newFilters = { [field]: value }
@@ -162,6 +162,23 @@ const ReporteVentas = () => {
       setSelectedSale(result.data)
       setIsCancelModalOpen(true)
     }
+  }
+
+  // NUEVO: Función para abrir el modal de entrega
+  const handleDeliverProducts = async (saleId) => {
+    const result = await getSaleById(saleId)
+    if (result.success) {
+      setSelectedSale(result.data)
+      setIsDeliverModalOpen(true)
+    }
+  }
+
+  // NUEVO: Callback cuando la entrega se completa en el modal
+  const onDeliveryComplete = async (saleId, newStatus) => {
+    setIsDeliverModalOpen(false)
+    toast.success(`Venta ${saleId} actualizada a estado: ${newStatus}`)
+    // Refrescar datos después de la entrega
+    await Promise.all([fetchSales({ offset: 0 }), fetchStats()])
   }
 
   const handleExport = async () => {
@@ -268,6 +285,11 @@ const ReporteVentas = () => {
   // Función para verificar si se puede cancelar la venta
   const canCancelSale = (sale) => {
     return sale.estado !== "anulada"
+  }
+
+  // Función para verificar si se puede entregar la venta
+  const canDeliverSale = (sale) => {
+    return sale.estado === "pendiente" && sale.detalles.some((d) => d.cantidad_entregada < d.cantidad)
   }
 
   if (loading && sales.length === 0) {
@@ -449,6 +471,7 @@ const ReporteVentas = () => {
                           >
                             <option value="todos">Todos los estados</option>
                             <option value="completada">Completadas</option>
+                            <option value="pendiente">Pendientes</option> {/* Nuevo estado */}
                             <option value="anulada">Anuladas</option>
                           </select>
                         </div>
@@ -567,6 +590,23 @@ const ReporteVentas = () => {
                               const IconComponent = paymentMethod.icon
                               const dateTime = extractExactDateTime(sale.fecha_creacion)
 
+                              // Configuración de estados para la tabla
+                              const statusConfig = {
+                                completada: {
+                                  label: "Completada",
+                                  color: "border-green-200 text-green-700 bg-green-50",
+                                },
+                                anulada: {
+                                  label: "Anulada",
+                                  color: "border-red-200 text-red-700 bg-red-50",
+                                },
+                                pendiente: {
+                                  label: "Pendiente",
+                                  color: "border-yellow-200 text-yellow-700 bg-yellow-50",
+                                },
+                              }
+                              const currentStatus = statusConfig[sale.estado] || { label: "Desconocido", color: "" }
+
                               return (
                                 <tr key={sale.id} className="border-b hover:bg-muted/50 transition-colors">
                                   <td className="py-3 px-4">
@@ -615,21 +655,8 @@ const ReporteVentas = () => {
                                   </td>
 
                                   <td className="py-3 px-4 text-center">
-                                    <Badge
-                                      variant="outline"
-                                      className={
-                                        sale.estado === "completada"
-                                          ? "border-green-200 text-green-700 bg-green-50"
-                                          : sale.estado === "anulada"
-                                            ? "border-red-200 text-red-700 bg-red-50"
-                                            : "border-gray-200 text-gray-700 bg-gray-50"
-                                      }
-                                    >
-                                      {sale.estado === "completada"
-                                        ? "Completada"
-                                        : sale.estado === "anulada"
-                                          ? "Anulada"
-                                          : "Sin estado"}
+                                    <Badge variant="outline" className={currentStatus.color}>
+                                      {currentStatus.label}
                                     </Badge>
                                   </td>
 
@@ -644,6 +671,17 @@ const ReporteVentas = () => {
                                       >
                                         <Eye className="w-4 h-4" />
                                       </Button>
+                                      {canDeliverSale(sale) && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => handleDeliverProducts(sale.id)}
+                                          className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
+                                          title="Entregar productos"
+                                        >
+                                          <Truck className="w-4 h-4" />
+                                        </Button>
+                                      )}
                                       {canCancelSale(sale) && (
                                         <Button
                                           size="sm"
@@ -886,6 +924,14 @@ const ReporteVentas = () => {
             onClose={() => setIsCancelModalOpen(false)}
             sale={selectedSale}
             onCancel={cancelSale}
+          />
+
+          {/* NUEVO: Modal de entrega de productos */}
+          <DeliverProductsModal
+            isOpen={isDeliverModalOpen}
+            onClose={() => setIsDeliverModalOpen(false)}
+            sale={selectedSale}
+            onDeliveryComplete={onDeliveryComplete}
           />
         </div>
       </div>

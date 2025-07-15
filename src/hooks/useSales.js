@@ -1,4 +1,4 @@
-// useSales.js - CORREGIDO PARA MANEJO CORRECTO DE IDs
+// useSales.js - CORREGIDO PARA MANEJO CORRECTO DE IDs Y VENTAS PENDIENTES
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
@@ -292,6 +292,37 @@ export const useSales = (initialFilters = {}) => {
       }
     } catch (error) {
       const message = error.message || "Error al anular venta"
+      toast.error(message)
+      return { success: false, message }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // NUEVO: Entregar productos de una venta pendiente
+  const deliverProducts = async (saleId, deliveries) => {
+    setLoading(true)
+    try {
+      const result = await salesService.deliverProducts(saleId, deliveries)
+      if (result.success) {
+        toast.success(result.message)
+        // Refrescar la venta seleccionada si es la que se está entregando
+        if (selectedSale && selectedSale.id === saleId) {
+          await getSaleById(saleId)
+        }
+        // Refrescar la lista de ventas y estadísticas
+        await Promise.all([
+          fetchSales({ silent: true }),
+          fetchTodaySummary({ silent: true }),
+          salesStats ? fetchSalesStats({ silent: true }) : Promise.resolve(),
+        ])
+        return { success: true, data: result.data }
+      } else {
+        toast.error(result.message)
+        return { success: false, message: result.message }
+      }
+    } catch (error) {
+      const message = error.message || "Error al entregar productos"
       toast.error(message)
       return { success: false, message }
     } finally {
@@ -643,6 +674,7 @@ export const useSales = (initialFilters = {}) => {
     const totalVentas = sales.length
     const ventasCompletadas = sales.filter((sale) => sale.estado === "completada").length
     const ventasAnuladas = sales.filter((sale) => sale.estado === "anulada").length
+    const ventasPendientes = sales.filter((sale) => sale.estado === "pendiente").length // Nuevo
 
     const ventasConCC = sales.filter((sale) => sale.tiene_cuenta_corriente).length
     const totalFacturado = sales
@@ -657,7 +689,7 @@ export const useSales = (initialFilters = {}) => {
       totalVentas,
       ventasCompletadas,
       ventasAnuladas,
-      ventasPendientes: totalVentas - ventasCompletadas - ventasAnuladas,
+      ventasPendientes, // Incluir en stats
       ventasConCC,
       ventasSinCC: totalVentas - ventasConCC,
       totalFacturado,
@@ -704,6 +736,7 @@ export const useSales = (initialFilters = {}) => {
     getSaleById,
     createSale,
     cancelSale,
+    deliverProducts, // Nueva función
     fetchSalesStats,
     fetchTodaySummary,
     getSalesByClient,

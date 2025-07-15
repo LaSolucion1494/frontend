@@ -259,6 +259,7 @@ export default function SaleDetailsModal({ isOpen, onClose, sale }) {
                               <TableRow>
                                 <TableHead>Producto</TableHead>
                                 <TableHead className="text-center">Cantidad</TableHead>
+                                <TableHead className="text-center">Entregado</TableHead> {/* Nueva columna */}
                                 <TableHead className="text-right">Precio Unit.</TableHead>
                                 <TableHead className="text-right">Descuento</TableHead>
                                 <TableHead className="text-right">Subtotal</TableHead>
@@ -277,6 +278,18 @@ export default function SaleDetailsModal({ isOpen, onClose, sale }) {
                                   </TableCell>
                                   <TableCell className="text-center">
                                     <Badge variant="outline">{detalle.cantidad}</Badge>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <Badge
+                                      variant="secondary"
+                                      className={
+                                        detalle.cantidad_entregada === detalle.cantidad
+                                          ? "bg-green-100 text-green-700"
+                                          : "bg-blue-100 text-blue-700"
+                                      }
+                                    >
+                                      {detalle.cantidad_entregada}
+                                    </Badge>
                                   </TableCell>
                                   <TableCell className="text-right">
                                     {formatCurrency(Number(detalle.precio_unitario) || 0)}

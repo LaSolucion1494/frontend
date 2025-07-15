@@ -65,6 +65,35 @@ export const useSuppliers = (initialFilters = {}) => {
     fetchSuppliers()
   }, [filters, fetchSuppliers])
 
+  // Nueva función para buscar proveedores sin paginación
+  const searchSuppliers = useCallback(async (term) => {
+    if (!term || term.length < 2) {
+      return { success: true, data: [] }
+    }
+    try {
+      const result = await suppliersService.search(term)
+      if (result.success) {
+        return { success: true, data: result.data }
+      } else {
+        console.error("useSuppliers.searchSuppliers - Error:", result.message)
+        // No mostrar toast aquí, dejar que el componente maneje el error
+        return { success: false, message: result.message, data: [] }
+      }
+    } catch (error) {
+      console.error("useSuppliers.searchSuppliers - Excepción:", error)
+      let errorMessage = "Error al buscar proveedores"
+      if (error.message?.includes("Network Error") || error.code === "ERR_NETWORK") {
+        errorMessage = "Error de conexión. Verifique su conexión a internet."
+      } else if (error.response?.status === 404) {
+        errorMessage = "Servicio de búsqueda no disponible."
+      } else if (error.response?.status >= 500) {
+        errorMessage = "Error del servidor. Intente nuevamente."
+      }
+      // No mostrar toast aquí, dejar que el componente maneje el error
+      return { success: false, message: errorMessage, data: [] }
+    }
+  }, []) // suppliersService.search es una dependencia estable
+
   const createSupplier = async (supplierData) => {
     setLoading(true)
     try {
@@ -139,6 +168,7 @@ export const useSuppliers = (initialFilters = {}) => {
     deleteSupplier,
     updateFilters,
     handlePageChange,
+    searchSuppliers, // Exportar la nueva función de búsqueda
     refetch: fetchSuppliers,
   }
 }

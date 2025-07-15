@@ -6,44 +6,57 @@ import { Input } from "../ui/input"
 import { Badge } from "../ui/badge"
 import { Search, Building, UserPlus, Phone, Mail, MapPin, FileText, X } from "lucide-react"
 import { useDebounce } from "../../hooks/useDebounce"
+import { useSuppliers } from "../../hooks/useSuppliers" // Importar el hook useSuppliers
 
-const SupplierSelectionModal = ({ isOpen, onClose, onSupplierSelect, proveedores = [], loading = false }) => {
+const SupplierSelectionModal = ({ isOpen, onClose, onSupplierSelect, selectedSupplier }) => {
   const [searchTerm, setSearchTerm] = useState("")
-  const [filteredSuppliers, setFilteredSuppliers] = useState([])
+  const [searchResults, setSearchResults] = useState([]) // Cambiado de filteredSuppliers
+  const [isSearching, setIsSearching] = useState(false) // Nuevo estado para la carga de búsqueda
   const searchRef = useRef(null)
+  const [searchError, setSearchError] = useState(null) // Nuevo estado para errores de búsqueda
 
-  const debouncedSearchTerm = useDebounce(searchTerm, 300)
+  const { searchSuppliers } = useSuppliers() // Usar el hook para la búsqueda
 
-  // Filtrar proveedores cuando cambia el término de búsqueda
+  const debouncedSearchTerm = useDebounce(searchTerm, 500) // Ajustado a 500ms
+
+  // Efecto para realizar la búsqueda cuando el término debounced cambia
   useEffect(() => {
-    if (!debouncedSearchTerm) {
-      setFilteredSuppliers([])
-      return
+    const performSearch = async () => {
+      if (!debouncedSearchTerm || debouncedSearchTerm.length < 2) {
+        setSearchResults([])
+        setSearchError(null)
+        setIsSearching(false)
+        return
+      }
+
+      setIsSearching(true)
+      setSearchError(null)
+
+      try {
+        console.log("Iniciando búsqueda de proveedor para:", debouncedSearchTerm)
+        const result = await searchSuppliers(debouncedSearchTerm) // Llamar a la función del hook
+
+        console.log("Resultado de búsqueda de proveedor:", result)
+
+        if (result.success) {
+          setSearchResults(result.data || [])
+          setSearchError(null)
+        } else {
+          console.error("Error en búsqueda de proveedor:", result.message)
+          setSearchResults([])
+          setSearchError(result.message || "Error al buscar proveedores")
+        }
+      } catch (error) {
+        console.error("Error en búsqueda de proveedores (excepción):", error)
+        setSearchResults([])
+        setSearchError(error.message || "Error al buscar proveedores. Intente nuevamente.")
+      } finally {
+        setIsSearching(false)
+      }
     }
 
-    const normalizedSearch = debouncedSearchTerm
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-
-    const filtered = proveedores.filter((proveedor) => {
-      const normalizedName = proveedor.nombre
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-      const normalizedPhone = proveedor.telefono ? proveedor.telefono.toLowerCase() : ""
-      const normalizedCuit = proveedor.cuit ? proveedor.cuit.toLowerCase() : ""
-
-      return (
-        normalizedName.includes(normalizedSearch) ||
-        normalizedPhone.includes(normalizedSearch) ||
-        normalizedCuit.includes(normalizedSearch) ||
-        (proveedor.email && proveedor.email.toLowerCase().includes(normalizedSearch))
-      )
-    })
-
-    setFilteredSuppliers(filtered)
-  }, [debouncedSearchTerm, proveedores])
+    performSearch()
+  }, [debouncedSearchTerm, searchSuppliers]) // Añadir searchSuppliers a las dependencias
 
   // Seleccionar proveedor
   const handleSelectSupplier = (proveedor) => {
@@ -83,7 +96,7 @@ const SupplierSelectionModal = ({ isOpen, onClose, onSupplierSelect, proveedores
     }).format(amount || 0)
   }
 
-  // Calcular saldo disponible
+  // Calcular saldo disponible (asumiendo que los proveedores también pueden tener cuenta corriente)
   const calcularSaldoDisponible = (proveedor) => {
     if (!proveedor.tiene_cuenta_corriente) return 0
     if (proveedor.limite_credito === null) return null
@@ -92,9 +105,20 @@ const SupplierSelectionModal = ({ isOpen, onClose, onSupplierSelect, proveedores
 
   const handleClose = () => {
     setSearchTerm("")
-    setFilteredSuppliers([])
+    setSearchResults([]) // Limpiar resultados al cerrar
+    setSearchError(null) // Limpiar errores al cerrar
+    setIsSearching(false) // Resetear estado de búsqueda
     onClose()
   }
+
+  // Auto-focus en el input cuando se abre el modal
+  useEffect(() => {
+    if (isOpen && searchRef.current) {
+      setTimeout(() => {
+        searchRef.current?.focus()
+      }, 100)
+    }
+  }, [isOpen])
 
   if (!isOpen) return null
 
@@ -117,7 +141,7 @@ const SupplierSelectionModal = ({ isOpen, onClose, onSupplierSelect, proveedores
             variant="ghost"
             size="sm"
             className="text-slate-300 hover:text-white hover:bg-slate-700"
-            disabled={loading}
+            disabled={isSearching} // Deshabilitar si está buscando
           >
             <X className="w-5 h-5" />
           </Button>
@@ -127,25 +151,35 @@ const SupplierSelectionModal = ({ isOpen, onClose, onSupplierSelect, proveedores
         <div className="flex-1 overflow-y-auto p-6" style={{ maxHeight: "calc(85vh - 140px)" }}>
           <div className="space-y-6">
             {/* Búsqueda */}
-            <div className="relative" ref={searchRef}>
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
               <Input
+                ref={searchRef} // Asignar la ref al input
                 type="text"
                 placeholder="Buscar proveedor por nombre, teléfono, CUIT o email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 border-slate-300 bg-slate-50 focus:border-slate-800 focus:ring-slate-800/20"
-                disabled={loading}
-                autoFocus
+                disabled={isSearching} // Deshabilitar si está buscando
               />
+              {isSearching && ( // Mostrar spinner de carga
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-800"></div>
+                </div>
+              )}
             </div>
+
+            {/* Información de búsqueda */}
+            {searchTerm && searchTerm.length < 2 && (
+              <div className="text-center text-slate-500 text-sm">Escriba al menos 2 caracteres para buscar</div>
+            )}
 
             {/* Botones rápidos */}
             <div className="flex gap-3">
               <Button
                 onClick={handleSelectSinProveedor}
                 className="flex-1 bg-slate-800 hover:bg-slate-700 text-white"
-                disabled={loading}
+                disabled={isSearching} // Deshabilitar si está buscando
               >
                 <Building className="h-4 w-4 mr-2" />
                 Sin Proveedor Específico
@@ -153,7 +187,7 @@ const SupplierSelectionModal = ({ isOpen, onClose, onSupplierSelect, proveedores
               <Button
                 variant="outline"
                 className="bg-white hover:bg-slate-50 text-slate-700 border-slate-300"
-                disabled={loading}
+                disabled={isSearching} // Deshabilitar si está buscando
               >
                 <UserPlus className="h-4 w-4 mr-2" />
                 Nuevo Proveedor
@@ -162,17 +196,20 @@ const SupplierSelectionModal = ({ isOpen, onClose, onSupplierSelect, proveedores
 
             {/* Resultados de búsqueda */}
             <div className="border border-slate-200 bg-white rounded-lg shadow-sm min-h-[400px]">
-              {loading ? (
+              {isSearching ? ( // Mostrar estado de carga
                 <div className="p-12 text-center text-slate-500">
                   <div className="inline-block h-8 w-8 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin mb-4"></div>
                   <p className="font-medium">Buscando proveedores...</p>
+                  <p className="text-sm text-slate-400 mt-1">Buscando en toda la base de datos</p>
                 </div>
-              ) : searchTerm && filteredSuppliers.length > 0 ? (
+              ) : searchTerm && searchTerm.length >= 2 && searchResults.length > 0 ? ( // Mostrar resultados si hay término y resultados
                 <div className="divide-y divide-slate-100">
-                  {filteredSuppliers.map((proveedor) => (
+                  {searchResults.map((proveedor) => (
                     <div
                       key={proveedor.id}
-                      className="p-6 hover:bg-slate-50 cursor-pointer transition-colors group"
+                      className={`p-6 hover:bg-slate-50 cursor-pointer transition-colors group ${
+                        selectedSupplier?.id === proveedor.id ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
+                      }`}
                       onClick={() => handleSelectSupplier(proveedor)}
                     >
                       <div className="flex items-start justify-between">
@@ -181,6 +218,9 @@ const SupplierSelectionModal = ({ isOpen, onClose, onSupplierSelect, proveedores
                             <div>
                               <h4 className="font-semibold text-slate-900 text-lg group-hover:text-slate-800">
                                 {proveedor.nombre}
+                                {selectedSupplier?.id === proveedor.id && (
+                                  <Badge className="ml-2 bg-blue-100 text-blue-800">Seleccionado</Badge>
+                                )}
                               </h4>
                               {proveedor.cuit && (
                                 <div className="flex items-center mt-1 text-sm text-slate-600">
@@ -223,34 +263,35 @@ const SupplierSelectionModal = ({ isOpen, onClose, onSupplierSelect, proveedores
                             </div>
                           )}
 
-                          {/* Cuenta corriente */}
-                          {proveedor.tiene_cuenta_corriente && (
-                            <div className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                          {/* Cuenta corriente (si aplica) */}
+                          {proveedor.tiene_cuenta_corriente ? (
+                            <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
                               <div className="flex items-center">
-                                <FileText className="w-4 h-4 mr-2 text-orange-600" />
-                                <span className="text-sm font-medium text-orange-800">Cuenta Corriente Activa</span>
+                                <FileText className="w-4 h-4 mr-2 text-blue-600" />
+                                <span className="text-sm font-medium text-blue-800">Cuenta Corriente Activa</span>
                               </div>
-                              <Badge variant="outline" className="bg-white border-orange-300 text-orange-700">
+                              <Badge variant="outline" className="bg-white border-blue-300 text-blue-700">
                                 Disponible:{" "}
                                 {calcularSaldoDisponible(proveedor) === null
                                   ? "Ilimitado"
                                   : formatCurrency(calcularSaldoDisponible(proveedor))}
                               </Badge>
                             </div>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
-              ) : searchTerm && filteredSuppliers.length === 0 ? (
+              ) : searchTerm && searchTerm.length >= 2 && searchResults.length === 0 && !isSearching ? ( // Mostrar mensaje de no encontrados
                 <div className="p-12 text-center text-slate-500">
                   <Building className="w-16 h-16 mx-auto mb-4 text-slate-300" />
                   <h3 className="font-medium text-lg mb-2">No se encontraron proveedores</h3>
-                  <p className="text-sm text-slate-400">
+                  <p className="text-sm text-slate-400 mb-2">No hay proveedores que coincidan con "{searchTerm}"</p>
+                  <p className="text-xs text-slate-400">
                     Intente con otros términos de búsqueda o cree un nuevo proveedor
                   </p>
-                </div>
+                </div> // Mensaje inicial
               ) : (
                 <div className="p-12 text-center text-slate-500">
                   <Search className="w-16 h-16 mx-auto mb-4 text-slate-300" />
@@ -264,6 +305,7 @@ const SupplierSelectionModal = ({ isOpen, onClose, onSupplierSelect, proveedores
                 </div>
               )}
             </div>
+            {searchError && <div className="text-red-500 text-center mt-4">{searchError}</div>}
           </div>
         </div>
       </div>

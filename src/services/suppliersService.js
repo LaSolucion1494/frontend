@@ -39,6 +39,21 @@ export const suppliersService = {
     }
   },
 
+  // Buscar proveedores por término (nombre, CUIT, teléfono, email)
+  async search(term) {
+    try {
+      const response = await apiClient.get(`/suppliers/search?term=${encodeURIComponent(term)}`)
+      return { success: true, data: response.data }
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || "Error al buscar proveedores",
+        error: error.response?.data,
+        data: [],
+      }
+    }
+  },
+
   // Crear un nuevo proveedor
   createSupplier: async (supplierData) => {
     try {

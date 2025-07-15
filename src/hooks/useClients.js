@@ -90,7 +90,7 @@ export const useClients = (initialFilters = {}) => {
       updateFilters({ offset: 0 })
     }
     fetchClients({ silent: true })
-  }, [filters.search, filters.activo, filters.conCuentaCorriente, filters.limit, filters.offset])
+  }, [filters.search, filters.activo, filters.conCuentaCorriente, filters.limit, filters.offset]) // Dependencia agregada para filters.offset
 
   const getClientById = async (id) => {
     if (!id || id < 1) {
@@ -121,8 +121,8 @@ export const useClients = (initialFilters = {}) => {
     }
   }
 
-  // CORREGIDO: Función de búsqueda mejorada con mejor manejo de errores
-  const searchClients = async (term) => {
+  // CORRECCIÓN: Envolver searchClients en useCallback
+  const searchClients = useCallback(async (term) => {
     if (!term || term.length < 2) {
       return { success: true, data: [] }
     }
@@ -161,7 +161,7 @@ export const useClients = (initialFilters = {}) => {
       // No mostrar toast aquí, dejar que el componente maneje el error
       return { success: false, message: errorMessage, data: [] }
     }
-  }
+  }, []) // Dependencia vacía porque clientsService.search es una importación estable
 
   const createClient = async (clientData) => {
     setLoading(true)

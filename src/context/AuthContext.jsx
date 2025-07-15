@@ -31,15 +31,28 @@ export const AuthProvider = ({ children }) => {
   const checkSession = useCallback(async () => {
     try {
       setLoading(true)
+
+      // Verificar si existe el token en las cookies antes de hacer la petición
+      const cookies = document.cookie.split(";")
+      const tokenCookie = cookies.find((cookie) => cookie.trim().startsWith("token-jwt="))
+
+      if (!tokenCookie || tokenCookie.split("=")[1].trim() === "") {
+        // No hay token, limpiar estado
+        clearAuthState()
+        return
+      }
+
       const result = await authService.checkSession()
-      if (result.success) {
+      if (result.success && result.data && result.data.user) {
         setUser(result.data.user)
         setIsAuthenticated(true)
         setError(null)
       } else {
+        // Token inválido o expirado
         clearAuthState()
       }
     } catch (error) {
+      // Error en la verificación, limpiar estado
       clearAuthState()
       console.error("Error checking session:", error)
     } finally {
@@ -50,7 +63,7 @@ export const AuthProvider = ({ children }) => {
   // Solo verificar sesión una vez al montar
   useEffect(() => {
     checkSession()
-  }, [])
+  }, [checkSession])
 
   const login = async (credentials) => {
     try {

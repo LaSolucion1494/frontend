@@ -16,32 +16,37 @@ import ProtectedRoute from "./lib/ProtectedRoute"
 import Configuraciones from "./pages/Configuraciones"
 import Proveedores from "./pages/Proveedores"
 import Categorias from "./pages/Categorias"
-// Agregar la importación del componente ReporteVentas
 import ReporteVentas from "./pages/ReporteVentas"
 import CierreCaja from "./pages/CierreCaja"
-// Importar MovimientosTable para su nueva ruta
 import MovimientosTable from "./components/cuenta-corriente/MovimientosTable"
 import StockMovementsHistory from "./pages/StockMovementsHistory"
 
-function AppRoutes() {
-  const { isAuthenticated, loading } = useAuth()
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-800 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-white mx-auto mb-4"></div>
-        </div>
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen bg-slate-800 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-white mx-auto mb-4"></div>
+        <p className="text-white text-lg">Verificando sesión...</p>
       </div>
-    )
+    </div>
+  )
+}
+
+function AppRoutes() {
+  const { isAuthenticated, loading, initialized } = useAuth()
+
+  // Mostrar loading solo mientras se inicializa la aplicación
+  if (!initialized || loading) {
+    return <LoadingScreen />
   }
 
   return (
     <Routes>
+      {/* Rutas públicas - solo accesibles si NO está autenticado */}
       <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />} />
 
-      {/* Rutas principales */}
+      {/* Rutas protegidas - solo accesibles si está autenticado */}
       <Route
         path="/dashboard"
         element={
@@ -84,7 +89,6 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      {/* En la sección de rutas de reportes, agregar: */}
       <Route
         path="/reportes/ventas"
         element={
@@ -127,7 +131,6 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      {/* Nueva ruta para movimientos de cuenta corriente */}
       <Route
         path="/cuenta-corriente/movimientos/:clienteId"
         element={
@@ -161,7 +164,11 @@ function AppRoutes() {
         }
       />
 
+      {/* Ruta raíz - redirige según el estado de autenticación */}
       <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
+
+      {/* Ruta catch-all para URLs no encontradas */}
+      <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
     </Routes>
   )
 }

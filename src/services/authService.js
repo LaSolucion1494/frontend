@@ -1,4 +1,4 @@
-import { apiClient } from "../lib/api" // Importar la instancia de Axios
+import { apiClient } from "../config/api" // Importar la instancia de Axios
 
 class AuthService {
   async login(credentials) {

@@ -13,47 +13,32 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, selectedClient 
   const [searchResults, setSearchResults] = useState([])
   const [isSearching, setIsSearching] = useState(false)
   const searchRef = useRef(null)
-  const [searchError, setSearchError] = useState(null)
 
   // Usar el hook de clientes para la búsqueda
   const { searchClients } = useClients()
 
-  // Actualizar el debounce a 300ms para mejor rendimiento:
-  const debouncedSearchTerm = useDebounce(searchTerm, 300)
+  const debouncedSearchTerm = useDebounce(searchTerm, 500)
 
-  // Mejorar el manejo de errores en el useEffect:
+  // Realizar búsqueda en el backend cuando cambia el término
   useEffect(() => {
     const performSearch = async () => {
       if (!debouncedSearchTerm || debouncedSearchTerm.length < 2) {
         setSearchResults([])
-        setSearchError(null)
         setIsSearching(false)
         return
       }
 
       setIsSearching(true)
-      setSearchError(null)
-
       try {
-        console.log("Iniciando búsqueda para:", debouncedSearchTerm)
         const result = await searchClients(debouncedSearchTerm)
-
-        console.log("Resultado de búsqueda:", result)
-
         if (result.success) {
           setSearchResults(result.data || [])
-          setSearchError(null)
         } else {
-          console.error("Error en búsqueda:", result.message)
           setSearchResults([])
-          setSearchError(result.message || "Error al buscar clientes")
         }
       } catch (error) {
         console.error("Error en búsqueda de clientes:", error)
         setSearchResults([])
-
-        // El error ya fue procesado por los servicios
-        setSearchError(error.message || "Error al buscar clientes. Intente nuevamente.")
       } finally {
         setIsSearching(false)
       }
@@ -309,7 +294,6 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, selectedClient 
                 </div>
               )}
             </div>
-            {searchError && <div className="text-red-500 text-center mt-4">{searchError}</div>}
           </div>
         </div>
       </div>

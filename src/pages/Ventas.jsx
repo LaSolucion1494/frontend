@@ -634,8 +634,6 @@ const Ventas = () => {
           isOpen={showClientModal}
           onClose={() => setShowClientModal(false)}
           onClientSelect={setClienteSeleccionado}
-          clientes={clients}
-          loading={loadingClients}
           selectedClient={clienteSeleccionado}
         />
 

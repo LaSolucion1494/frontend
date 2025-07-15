@@ -6,44 +6,46 @@ import { Input } from "../ui/input"
 import { Badge } from "../ui/badge"
 import { Search, User, UserPlus, Phone, Mail, Building2, CreditCard, X } from "lucide-react"
 import { useDebounce } from "../../hooks/useDebounce"
+import { useClients } from "../../hooks/useClients"
 
-const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, clientes = [], loading = false }) => {
+const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, selectedClient }) => {
   const [searchTerm, setSearchTerm] = useState("")
-  const [filteredClients, setFilteredClients] = useState([])
+  const [searchResults, setSearchResults] = useState([])
+  const [isSearching, setIsSearching] = useState(false)
   const searchRef = useRef(null)
+
+  // Usar el hook de clientes para la búsqueda
+  const { searchClients } = useClients()
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
-  // Filtrar clientes cuando cambia el término de búsqueda
+  // Realizar búsqueda en el backend cuando cambia el término
   useEffect(() => {
-    if (!debouncedSearchTerm) {
-      setFilteredClients([])
-      return
+    const performSearch = async () => {
+      if (!debouncedSearchTerm || debouncedSearchTerm.length < 2) {
+        setSearchResults([])
+        setIsSearching(false)
+        return
+      }
+
+      setIsSearching(true)
+      try {
+        const result = await searchClients(debouncedSearchTerm)
+        if (result.success) {
+          setSearchResults(result.data || [])
+        } else {
+          setSearchResults([])
+        }
+      } catch (error) {
+        console.error("Error en búsqueda de clientes:", error)
+        setSearchResults([])
+      } finally {
+        setIsSearching(false)
+      }
     }
 
-    const normalizedSearch = debouncedSearchTerm
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-
-    const filtered = clientes.filter((cliente) => {
-      const normalizedName = cliente.nombre
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-      const normalizedPhone = cliente.telefono ? cliente.telefono.toLowerCase() : ""
-      const normalizedCuit = cliente.cuit ? cliente.cuit.toLowerCase() : ""
-
-      return (
-        normalizedName.includes(normalizedSearch) ||
-        normalizedPhone.includes(normalizedSearch) ||
-        normalizedCuit.includes(normalizedSearch) ||
-        (cliente.email && cliente.email.toLowerCase().includes(normalizedSearch))
-      )
-    })
-
-    setFilteredClients(filtered)
-  }, [debouncedSearchTerm, clientes])
+    performSearch()
+  }, [debouncedSearchTerm, searchClients])
 
   // Seleccionar cliente
   const handleSelectClient = (cliente) => {
@@ -92,9 +94,19 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, clientes = [], 
 
   const handleClose = () => {
     setSearchTerm("")
-    setFilteredClients([])
+    setSearchResults([])
+    setIsSearching(false)
     onClose()
   }
+
+  // Auto-focus en el input cuando se abre el modal
+  useEffect(() => {
+    if (isOpen && searchRef.current) {
+      setTimeout(() => {
+        searchRef.current?.focus()
+      }, 100)
+    }
+  }, [isOpen])
 
   if (!isOpen) return null
 
@@ -117,7 +129,7 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, clientes = [], 
             variant="ghost"
             size="sm"
             className="text-slate-300 hover:text-white hover:bg-slate-700"
-            disabled={loading}
+            disabled={isSearching}
           >
             <X className="w-5 h-5" />
           </Button>
@@ -127,25 +139,35 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, clientes = [], 
         <div className="flex-1 overflow-y-auto p-6" style={{ maxHeight: "calc(85vh - 140px)" }}>
           <div className="space-y-6">
             {/* Búsqueda */}
-            <div className="relative" ref={searchRef}>
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
               <Input
+                ref={searchRef}
                 type="text"
                 placeholder="Buscar cliente por nombre, teléfono, CUIT o email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 border-slate-300 bg-slate-50 focus:border-slate-800 focus:ring-slate-800/20"
-                disabled={loading}
-                autoFocus
+                disabled={isSearching}
               />
+              {isSearching && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-800"></div>
+                </div>
+              )}
             </div>
+
+            {/* Información de búsqueda */}
+            {searchTerm && searchTerm.length < 2 && (
+              <div className="text-center text-slate-500 text-sm">Escriba al menos 2 caracteres para buscar</div>
+            )}
 
             {/* Botones rápidos */}
             <div className="flex gap-3">
               <Button
                 onClick={handleSelectConsumidorFinal}
                 className="flex-1 bg-slate-800 hover:bg-slate-700 text-white"
-                disabled={loading}
+                disabled={isSearching}
               >
                 <User className="h-4 w-4 mr-2" />
                 Consumidor Final
@@ -153,7 +175,7 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, clientes = [], 
               <Button
                 variant="outline"
                 className="bg-white hover:bg-slate-50 text-slate-700 border-slate-300"
-                disabled={loading}
+                disabled={isSearching}
               >
                 <UserPlus className="h-4 w-4 mr-2" />
                 Nuevo Cliente
@@ -162,17 +184,20 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, clientes = [], 
 
             {/* Resultados de búsqueda */}
             <div className="border border-slate-200 bg-white rounded-lg shadow-sm min-h-[400px]">
-              {loading ? (
+              {isSearching ? (
                 <div className="p-12 text-center text-slate-500">
                   <div className="inline-block h-8 w-8 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin mb-4"></div>
                   <p className="font-medium">Buscando clientes...</p>
+                  <p className="text-sm text-slate-400 mt-1">Buscando en toda la base de datos</p>
                 </div>
-              ) : searchTerm && filteredClients.length > 0 ? (
+              ) : searchTerm && searchTerm.length >= 2 && searchResults.length > 0 ? (
                 <div className="divide-y divide-slate-100">
-                  {filteredClients.map((cliente) => (
+                  {searchResults.map((cliente) => (
                     <div
                       key={cliente.id}
-                      className="p-6 hover:bg-slate-50 cursor-pointer transition-colors group"
+                      className={`p-6 hover:bg-slate-50 cursor-pointer transition-colors group ${
+                        selectedClient?.id === cliente.id ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
+                      }`}
                       onClick={() => handleSelectClient(cliente)}
                     >
                       <div className="flex items-start justify-between">
@@ -181,6 +206,9 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, clientes = [], 
                             <div>
                               <h4 className="font-semibold text-slate-900 text-lg group-hover:text-slate-800">
                                 {cliente.nombre}
+                                {selectedClient?.id === cliente.id && (
+                                  <Badge className="ml-2 bg-blue-100 text-blue-800">Seleccionado</Badge>
+                                )}
                               </h4>
                               {cliente.cuit && (
                                 <div className="flex items-center mt-1 text-sm text-slate-600">
@@ -224,7 +252,7 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, clientes = [], 
                           )}
 
                           {/* Cuenta corriente */}
-                          {cliente.tiene_cuenta_corriente && (
+                          {cliente.tiene_cuenta_corriente ? (
                             <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
                               <div className="flex items-center">
                                 <CreditCard className="w-4 h-4 mr-2 text-blue-600" />
@@ -237,17 +265,18 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, clientes = [], 
                                   : formatCurrency(calcularSaldoDisponible(cliente))}
                               </Badge>
                             </div>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
-              ) : searchTerm && filteredClients.length === 0 ? (
+              ) : searchTerm && searchTerm.length >= 2 && searchResults.length === 0 && !isSearching ? (
                 <div className="p-12 text-center text-slate-500">
                   <User className="w-16 h-16 mx-auto mb-4 text-slate-300" />
                   <h3 className="font-medium text-lg mb-2">No se encontraron clientes</h3>
-                  <p className="text-sm text-slate-400">
+                  <p className="text-sm text-slate-400 mb-2">No hay clientes que coincidan con "{searchTerm}"</p>
+                  <p className="text-xs text-slate-400">
                     Intente con otros términos de búsqueda o cree un nuevo cliente
                   </p>
                 </div>
@@ -257,6 +286,9 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, clientes = [], 
                   <h3 className="font-medium text-lg mb-2">Busque un cliente</h3>
                   <p className="text-sm text-slate-400 mb-4">
                     Use el campo de búsqueda para encontrar clientes registrados
+                  </p>
+                  <p className="text-xs text-slate-400 mb-2">
+                    La búsqueda se realiza en toda la base de datos, no solo en la página actual
                   </p>
                   <p className="text-xs text-slate-400">O seleccione "Consumidor Final" para una venta rápida</p>
                 </div>

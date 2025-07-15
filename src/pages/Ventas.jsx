@@ -55,7 +55,7 @@ const Ventas = () => {
   const [completedSale, setCompletedSale] = useState(null)
 
   const { products, loading: loadingProducts, fetchProducts } = useProducts()
-  const { clients, loading: loadingClients, fetchClients } = useClients()
+  const { clients, fetchClients } = useClients()
   const { loading: loadingSale, createSale, prepareSaleDataFromForm, getSaleById } = useSales()
   const { config, loading: loadingConfig } = useConfig()
 
@@ -634,8 +634,6 @@ const Ventas = () => {
           isOpen={showClientModal}
           onClose={() => setShowClientModal(false)}
           onClientSelect={setClienteSeleccionado}
-          clientes={clients}
-          loading={loadingClients}
           selectedClient={clienteSeleccionado}
         />
 

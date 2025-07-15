@@ -1,7 +1,7 @@
 import axios from "axios"
 
 // CORREGIDO: Verificar que el puerto coincida con tu servidor backend
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "api.lasolucionrepuestos.site"
+export const API_BASE_URL = import.meta.env.VITE_API_URL || "https://api.lasolucionrepuestos.site/api"
 
 // Instancia de axios configurada
 export const apiClient = axios.create({

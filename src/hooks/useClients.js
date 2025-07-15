@@ -121,14 +121,17 @@ export const useClients = (initialFilters = {}) => {
     }
   }
 
+  // CORREGIDO: Función de búsqueda mejorada con mejor manejo de errores
   const searchClients = async (term) => {
     if (!term || term.length < 2) {
       return { success: true, data: [] }
     }
 
-    setLoading(true)
     try {
+      console.log("useClients.searchClients - Buscando:", term)
       const result = await clientsService.search(term)
+
+      console.log("useClients.searchClients - Resultado:", result)
 
       if (result.success) {
         const formattedResults = result.data.map((client) => ({
@@ -137,15 +140,26 @@ export const useClients = (initialFilters = {}) => {
         }))
         return { success: true, data: formattedResults }
       } else {
-        toast.error(result.message)
+        console.error("useClients.searchClients - Error:", result.message)
+        // No mostrar toast aquí, dejar que el componente maneje el error
         return { success: false, message: result.message, data: [] }
       }
     } catch (error) {
-      const message = "Error al buscar clientes"
-      toast.error(message)
-      return { success: false, message, data: [] }
-    } finally {
-      setLoading(false)
+      console.error("useClients.searchClients - Excepción:", error)
+
+      // Mejorar el manejo de errores de red
+      let errorMessage = "Error al buscar clientes"
+
+      if (error.message?.includes("Network Error") || error.code === "ERR_NETWORK") {
+        errorMessage = "Error de conexión. Verifique su conexión a internet."
+      } else if (error.response?.status === 404) {
+        errorMessage = "Servicio de búsqueda no disponible."
+      } else if (error.response?.status >= 500) {
+        errorMessage = "Error del servidor. Intente nuevamente."
+      }
+
+      // No mostrar toast aquí, dejar que el componente maneje el error
+      return { success: false, message: errorMessage, data: [] }
     }
   }
 

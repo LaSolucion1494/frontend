@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
 import { Badge } from "../ui/badge"
-import { Search, User, UserPlus, Phone, Mail, Building2, CreditCard, X, AlertCircle } from "lucide-react"
+import { Search, User, UserPlus, Phone, Mail, Building2, CreditCard, X } from "lucide-react"
 import { useDebounce } from "../../hooks/useDebounce"
 import { useClients } from "../../hooks/useClients"
 
@@ -12,15 +12,16 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, selectedClient 
   const [searchTerm, setSearchTerm] = useState("")
   const [searchResults, setSearchResults] = useState([])
   const [isSearching, setIsSearching] = useState(false)
-  const [searchError, setSearchError] = useState(null)
   const searchRef = useRef(null)
+  const [searchError, setSearchError] = useState(null)
 
   // Usar el hook de clientes para la búsqueda
   const { searchClients } = useClients()
 
-  const debouncedSearchTerm = useDebounce(searchTerm, 500) // Aumenté el debounce
+  // Actualizar el debounce a 300ms para mejor rendimiento:
+  const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
-  // Realizar búsqueda en el backend cuando cambia el término
+  // Mejorar el manejo de errores en el useEffect:
   useEffect(() => {
     const performSearch = async () => {
       if (!debouncedSearchTerm || debouncedSearchTerm.length < 2) {
@@ -51,16 +52,8 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, selectedClient 
         console.error("Error en búsqueda de clientes:", error)
         setSearchResults([])
 
-        // Mejorar el manejo de errores
-        if (error.message?.includes("Network Error") || error.message?.includes("ERR_INTERNET_DISCONNECTED")) {
-          setSearchError("Error de conexión. Verifique su conexión a internet.")
-        } else if (error.response?.status === 404) {
-          setSearchError("Servicio de búsqueda no disponible.")
-        } else if (error.response?.status >= 500) {
-          setSearchError("Error del servidor. Intente nuevamente.")
-        } else {
-          setSearchError("Error al buscar clientes. Intente nuevamente.")
-        }
+        // El error ya fue procesado por los servicios
+        setSearchError(error.message || "Error al buscar clientes. Intente nuevamente.")
       } finally {
         setIsSearching(false)
       }
@@ -117,36 +110,8 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, selectedClient 
   const handleClose = () => {
     setSearchTerm("")
     setSearchResults([])
-    setSearchError(null)
     setIsSearching(false)
     onClose()
-  }
-
-  // Reintentar búsqueda
-  const handleRetrySearch = () => {
-    if (searchTerm && searchTerm.length >= 2) {
-      setSearchError(null)
-      setIsSearching(true)
-      // Forzar nueva búsqueda
-      const performSearch = async () => {
-        try {
-          const result = await searchClients(searchTerm)
-          if (result.success) {
-            setSearchResults(result.data || [])
-            setSearchError(null)
-          } else {
-            setSearchResults([])
-            setSearchError(result.message || "Error al buscar clientes")
-          }
-        } catch (error) {
-          setSearchResults([])
-          setSearchError("Error al buscar clientes. Intente nuevamente.")
-        } finally {
-          setIsSearching(false)
-        }
-      }
-      performSearch()
-    }
   }
 
   // Auto-focus en el input cuando se abre el modal
@@ -207,31 +172,8 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, selectedClient 
               )}
             </div>
 
-            {/* Error de búsqueda */}
-            {searchError && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
-                    <div>
-                      <h4 className="text-sm font-medium text-red-800">Error de búsqueda</h4>
-                      <p className="text-sm text-red-700 mt-1">{searchError}</p>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={handleRetrySearch}
-                    size="sm"
-                    variant="outline"
-                    className="border-red-300 text-red-700 hover:bg-red-100 bg-transparent"
-                  >
-                    Reintentar
-                  </Button>
-                </div>
-              </div>
-            )}
-
             {/* Información de búsqueda */}
-            {searchTerm && searchTerm.length < 2 && !searchError && (
+            {searchTerm && searchTerm.length < 2 && (
               <div className="text-center text-slate-500 text-sm">Escriba al menos 2 caracteres para buscar</div>
             )}
 
@@ -261,29 +203,10 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, selectedClient 
                 <div className="p-12 text-center text-slate-500">
                   <div className="inline-block h-8 w-8 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin mb-4"></div>
                   <p className="font-medium">Buscando clientes...</p>
-                  <p className="text-sm text-slate-400 mt-1">Buscando "{searchTerm}" en toda la base de datos</p>
-                </div>
-              ) : searchError ? (
-                <div className="p-12 text-center text-slate-500">
-                  <AlertCircle className="w-16 h-16 mx-auto mb-4 text-red-300" />
-                  <h3 className="font-medium text-lg mb-2 text-red-600">Error en la búsqueda</h3>
-                  <p className="text-sm text-red-500 mb-4">{searchError}</p>
-                  <Button
-                    onClick={handleRetrySearch}
-                    variant="outline"
-                    className="border-red-300 text-red-700 bg-transparent"
-                  >
-                    Reintentar búsqueda
-                  </Button>
+                  <p className="text-sm text-slate-400 mt-1">Buscando en toda la base de datos</p>
                 </div>
               ) : searchTerm && searchTerm.length >= 2 && searchResults.length > 0 ? (
                 <div className="divide-y divide-slate-100">
-                  <div className="p-3 bg-slate-50 border-b">
-                    <p className="text-sm text-slate-600">
-                      {searchResults.length} cliente{searchResults.length !== 1 ? "s" : ""} encontrado
-                      {searchResults.length !== 1 ? "s" : ""} para "{searchTerm}"
-                    </p>
-                  </div>
                   {searchResults.map((cliente) => (
                     <div
                       key={cliente.id}
@@ -363,7 +286,7 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, selectedClient 
                     </div>
                   ))}
                 </div>
-              ) : searchTerm && searchTerm.length >= 2 && searchResults.length === 0 && !isSearching && !searchError ? (
+              ) : searchTerm && searchTerm.length >= 2 && searchResults.length === 0 && !isSearching ? (
                 <div className="p-12 text-center text-slate-500">
                   <User className="w-16 h-16 mx-auto mb-4 text-slate-300" />
                   <h3 className="font-medium text-lg mb-2">No se encontraron clientes</h3>
@@ -386,6 +309,7 @@ const ClientSelectionModal = ({ isOpen, onClose, onClientSelect, selectedClient 
                 </div>
               )}
             </div>
+            {searchError && <div className="text-red-500 text-center mt-4">{searchError}</div>}
           </div>
         </div>
       </div>

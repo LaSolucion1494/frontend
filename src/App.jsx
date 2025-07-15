@@ -21,23 +21,19 @@ import CierreCaja from "./pages/CierreCaja"
 import MovimientosTable from "./components/cuenta-corriente/MovimientosTable"
 import StockMovementsHistory from "./pages/StockMovementsHistory"
 
-function LoadingScreen() {
-  return (
-    <div className="min-h-screen bg-slate-800 flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-white mx-auto mb-4"></div>
-        <p className="text-white text-lg">Verificando sesión...</p>
-      </div>
-    </div>
-  )
-}
-
 function AppRoutes() {
-  const { isAuthenticated, loading, initialized } = useAuth()
+  const { isAuthenticated, loading } = useAuth()
 
-  // Mostrar loading solo mientras se inicializa la aplicación
-  if (!initialized || loading) {
-    return <LoadingScreen />
+  // Mostrar loading mientras se verifica la autenticación inicial
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-800 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-white mx-auto mb-4"></div>
+          <p className="text-white text-lg">Verificando sesión...</p>
+        </div>
+      </div>
+    )
   }
 
   return (

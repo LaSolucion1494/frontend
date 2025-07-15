@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react"
+import { createContext, useContext, useState, useEffect } from "react"
 import { authService } from "../services/authService"
 import toast from "react-hot-toast"
 
@@ -16,60 +16,32 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [initialized, setInitialized] = useState(false)
 
-  const clearAuthState = useCallback(() => {
-    setUser(null)
-    setIsAuthenticated(false)
-    setError(null)
-    // Limpiar cookies del lado del cliente
-    document.cookie = "token-jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=" + window.location.hostname
-    document.cookie = "token-jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/"
-  }, [])
-
-  const checkSession = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      // Verificar si existe el token en las cookies
-      const hasToken = document.cookie.includes("token-jwt=")
-
-      if (!hasToken) {
-        clearAuthState()
-        setInitialized(true)
-        return
-      }
-
-      const result = await authService.checkSession()
-
-      if (result.success && result.data?.user) {
-        setUser(result.data.user)
-        setIsAuthenticated(true)
-        setError(null)
-      } else {
-        // Si el servidor dice que no hay sesión válida, limpiar todo
-        clearAuthState()
-      }
-    } catch (error) {
-      console.error("Error checking session:", error)
-      // En caso de error, limpiar el estado de autenticación
-      clearAuthState()
-    } finally {
-      setLoading(false)
-      setInitialized(true)
-    }
-  }, [clearAuthState])
-
-  // Solo verificar sesión una vez al montar
+  // Verificar si hay un usuario autenticado al cargar la aplicación
   useEffect(() => {
-    if (!initialized) {
-      checkSession()
+    const checkAuthStatus = async () => {
+      try {
+        // Intentar obtener el usuario actual desde la API
+        const result = await authService.checkSession()
+
+        if (result.success && result.data?.user) {
+          setUser(result.data.user)
+        } else {
+          setUser(null)
+        }
+      } catch (error) {
+        console.error("Error al verificar el estado de autenticación:", error)
+        setUser(null)
+        setError(error)
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [checkSession, initialized])
+
+    checkAuthStatus()
+  }, [])
 
   const login = async (credentials) => {
     try {
@@ -80,7 +52,6 @@ export const AuthProvider = ({ children }) => {
 
       if (result.success && result.data) {
         setUser(result.data)
-        setIsAuthenticated(true)
         toast.success(`¡Bienvenido ${result.data.nombre}!`, {
           icon: "🎉",
         })
@@ -133,29 +104,27 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      setLoading(true)
       await authService.logout()
+      setUser(null)
       toast.success("Sesión cerrada correctamente")
+      return true
     } catch (error) {
       console.error("Error al cerrar sesión:", error)
       toast.error("Error al cerrar sesión")
-    } finally {
-      clearAuthState()
-      setLoading(false)
+      setUser(null) // Limpiar el estado local aunque falle el logout
+      return false
     }
   }
 
+  // Valores que se proporcionarán a través del contexto
   const value = {
     user,
-    isAuthenticated,
     loading,
     error,
-    initialized,
     login,
     register,
     logout,
-    clearAuthState,
-    checkSession,
+    isAuthenticated: !!user,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

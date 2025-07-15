@@ -4,11 +4,11 @@ import { useAuth } from "../context/AuthContext"
 import { Navigate, useLocation } from "react-router-dom"
 
 const ProtectedRoute = ({ children, adminOnly = false }) => {
-  const { isAuthenticated, loading, user, initialized } = useAuth()
+  const { isAuthenticated, loading, user } = useAuth()
   const location = useLocation()
 
   // Mostrar loading mientras se verifica la autenticación
-  if (!initialized || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-slate-800 flex items-center justify-center">
         <div className="text-center">

@@ -8,15 +8,25 @@ import { Search, Package, Plus, Barcode, Tag, X, AlertTriangle } from "lucide-re
 import { useDebounce } from "../../hooks/useDebounce"
 import SalesQuantityModal from "./SalesQuantityModal"
 
-const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, products = [], loading = false }) => {
+const ProductSelectionModal = ({
+  isOpen,
+  onClose,
+  onProductSelect,
+  products = [],
+  loading = false,
+  onSearchChange,
+  onPageChange,
+  pagination,
+}) => {
   const [searchTerm, setSearchTerm] = useState("")
-  const [filteredProducts, setFilteredProducts] = useState([])
+  // ELIMINAR: const [filteredProducts, setFilteredProducts] = useState([])
   const [showQuantityModal, setShowQuantityModal] = useState(false)
   const [selectedProductForQuantity, setSelectedProductForQuantity] = useState(null)
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
-  // Filtrar productos cuando cambia el término de búsqueda
+  // ELIMINAR: useEffect para filtrado local
+  /*
   useEffect(() => {
     let filtered = products.filter((product) => product.activo !== false)
 
@@ -64,6 +74,14 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, products = []
 
     setFilteredProducts(filtered.slice(0, 50))
   }, [debouncedSearchTerm, products])
+  */
+
+  // NUEVO: Disparar la búsqueda en el backend cuando el término de búsqueda debounced cambia
+  useEffect(() => {
+    if (onSearchChange) {
+      onSearchChange(debouncedSearchTerm)
+    }
+  }, [debouncedSearchTerm, onSearchChange])
 
   // Manejar selección de producto
   const handleSelectProduct = (product) => {
@@ -95,7 +113,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, products = []
   // Limpiar estado al cerrar
   const handleClose = () => {
     setSearchTerm("")
-    setFilteredProducts([])
+    // ELIMINAR: setFilteredProducts([])
     onClose()
   }
 
@@ -174,7 +192,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, products = []
                 type="text"
                 placeholder="Buscar por nombre, código o marca..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => setSearchTerm(e.target.value)} // Esto ahora dispara el useEffect que llama a onSearchChange
                 className="pl-10 border-slate-300 bg-slate-50 focus:border-slate-800 focus:ring-slate-800/20"
                 disabled={loading}
                 autoFocus
@@ -188,9 +206,10 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, products = []
                   <div className="inline-block h-8 w-8 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin mb-4"></div>
                   <p className="font-medium">Buscando productos...</p>
                 </div>
-              ) : searchTerm && filteredProducts.length > 0 ? (
+              ) : products.length > 0 ? ( // CAMBIO: Usar `products` directamente
                 <div className="divide-y divide-slate-100">
-                  {filteredProducts.map((product) => {
+                  {products.map((product) => {
+                    // CAMBIO: Usar `products` directamente
                     const stockStatus = getStockStatus(product)
                     const precioVenta = product.precio_venta || 0
                     const StatusIcon = stockStatus.icon
@@ -276,13 +295,32 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, products = []
                     )
                   })}
 
-                  {filteredProducts.length === 50 && (
-                    <div className="p-4 text-center text-xs text-slate-500 bg-slate-50 border-t border-slate-100">
-                      Mostrando los primeros 50 resultados. Refine su búsqueda para ver más productos.
+                  {/* NUEVO: Controles de paginación */}
+                  {pagination && pagination.totalPages > 1 && (
+                    <div className="p-4 flex justify-between items-center border-t border-slate-100 bg-slate-50">
+                      <Button
+                        onClick={() => onPageChange(pagination.currentPage - 1)}
+                        disabled={pagination.currentPage === 1 || loading}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Anterior
+                      </Button>
+                      <span className="text-sm text-slate-600">
+                        Página {pagination.currentPage} de {pagination.totalPages}
+                      </span>
+                      <Button
+                        onClick={() => onPageChange(pagination.currentPage + 1)}
+                        disabled={pagination.currentPage === pagination.totalPages || loading}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Siguiente
+                      </Button>
                     </div>
                   )}
                 </div>
-              ) : searchTerm && filteredProducts.length === 0 ? (
+              ) : searchTerm && products.length === 0 ? ( // CAMBIO: Usar `products` directamente
                 <div className="p-12 text-center text-slate-500">
                   <Package className="w-16 h-16 mx-auto mb-4 text-slate-300" />
                   <h3 className="font-medium text-lg mb-2">No se encontraron productos</h3>

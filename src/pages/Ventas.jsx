@@ -54,7 +54,7 @@ const Ventas = () => {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [completedSale, setCompletedSale] = useState(null)
 
-  const { products, loading: loadingProducts, fetchProducts } = useProducts()
+  const { products, loading: loadingProducts, fetchProducts, updateFilters, pagination } = useProducts()
   const { clients, loading: loadingClients, fetchClients } = useClients()
   const { loading: loadingSale, createSale, prepareSaleDataFromForm, getSaleById } = useSales()
   const { config, loading: loadingConfig } = useConfig()
@@ -286,6 +286,10 @@ const Ventas = () => {
 
   const canProcessPayment = () => {
     return !!clienteSeleccionado && cartProducts.length > 0
+  }
+
+  const handlePageChange = (newPage) => {
+    updateFilters({ offset: (newPage - 1) * 10 })
   }
 
   if (loadingConfig) {
@@ -644,6 +648,9 @@ const Ventas = () => {
           onProductSelect={addProductToCart}
           products={products}
           loading={loadingProducts}
+          onSearchChange={(newSearchTerm) => updateFilters({ search: newSearchTerm, offset: 0 })}
+          onPageChange={(newPage) => handlePageChange(newPage)}
+          pagination={pagination}
         />
 
         <PaymentModal

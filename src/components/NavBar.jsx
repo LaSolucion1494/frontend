@@ -22,6 +22,7 @@ import {
   Users,
   Truck,
   LayoutGrid,
+  Calculator,
 } from "lucide-react"
 import { Dialog, Transition, Menu as HeadlessMenu } from "@headlessui/react"
 
@@ -123,6 +124,7 @@ const Navbar = () => {
       dropdown: [
         { name: "Reporte de compras", href: "/reportes/compras", icon: TrendingUp },
         { name: "Reporte de ventas", href: "/reportes/ventas", icon: FileText },
+        { name: "Reporte de presupuestos", href: "/reportes/presupuestos", icon: Calculator },
       ],
     },
     {

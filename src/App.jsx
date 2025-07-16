@@ -17,6 +17,7 @@ import Configuraciones from "./pages/Configuraciones"
 import Proveedores from "./pages/Proveedores"
 import Categorias from "./pages/Categorias"
 import ReporteVentas from "./pages/ReporteVentas"
+import ReportePresupuestos from "./pages/ReportePresupuestos"
 import CierreCaja from "./pages/CierreCaja"
 import MovimientosTable from "./components/cuenta-corriente/MovimientosTable"
 import StockMovementsHistory from "./pages/StockMovementsHistory"
@@ -90,6 +91,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute adminOnly>
             <ReporteVentas />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reportes/presupuestos"
+        element={
+          <ProtectedRoute adminOnly>
+            <ReportePresupuestos />
           </ProtectedRoute>
         }
       />

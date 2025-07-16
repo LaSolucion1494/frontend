@@ -68,8 +68,8 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
     type: "efectivo",
     amount: "",
     description: "",
-    cardInterest: 0, // Nuevo estado para interés de tarjeta
-    installments: 1, // Nuevo estado para cuotas
+    cardInterest: "", // Cambiado a string vacío para mejor UX
+    installments: "", // Cambiado a string vacío para mejor UX
   })
   const [errors, setErrors] = useState({})
 
@@ -84,8 +84,8 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
         type: "efectivo",
         amount: "",
         description: "",
-        cardInterest: 0,
-        installments: 1,
+        cardInterest: "",
+        installments: "",
       })
       setErrors({})
     }
@@ -204,10 +204,17 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
       })
     }
 
+    const cardInterestValue = Number.parseFloat(newPayment.cardInterest) || 0
+    const installmentsValue = Number.parseInt(newPayment.installments) || 1
+
     let description = newPayment.description || getDefaultDescription(newPayment.type)
+    let clientPays = undefined
+    let amountPerInstallment = undefined
+
     if (newPayment.type === "tarjeta") {
-      const clientPays = calculateClientPaysAmount(newPayment.amount, newPayment.cardInterest)
-      description = `Tarjeta: ${formatCurrency(newPayment.amount)} + ${newPayment.cardInterest}% interés en ${newPayment.installments} cuotas. Cliente paga: ${formatCurrency(clientPays)}`
+      clientPays = calculateClientPaysAmount(newPayment.amount, cardInterestValue)
+      amountPerInstallment = clientPays / installmentsValue
+      description = `Tarjeta: ${formatCurrency(newPayment.amount)} + ${cardInterestValue}% interés en ${installmentsValue} cuotas. Cliente paga: ${formatCurrency(clientPays)} (${formatCurrency(amountPerInstallment)}/cuota)`
     }
 
     const payment = {
@@ -216,12 +223,10 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
       amount: Number.parseFloat(newPayment.amount),
       description: description,
       // Guardar estos campos para referencia visual en el listado de pagos del modal
-      cardInterest: newPayment.type === "tarjeta" ? newPayment.cardInterest : undefined,
-      installments: newPayment.type === "tarjeta" ? newPayment.installments : undefined,
-      clientPaysAmount:
-        newPayment.type === "tarjeta"
-          ? calculateClientPaysAmount(newPayment.amount, newPayment.cardInterest)
-          : undefined,
+      cardInterest: newPayment.type === "tarjeta" ? cardInterestValue : undefined,
+      installments: newPayment.type === "tarjeta" ? installmentsValue : undefined,
+      clientPaysAmount: newPayment.type === "tarjeta" ? clientPays : undefined,
+      amountPerInstallment: newPayment.type === "tarjeta" ? amountPerInstallment : undefined,
     }
 
     setPayments((prev) => [...prev, payment])
@@ -229,8 +234,8 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
       type: "efectivo",
       amount: "",
       description: "",
-      cardInterest: 0,
-      installments: 1,
+      cardInterest: "",
+      installments: "",
     })
     setErrors({}) // Limpiar errores después de agregar un pago exitosamente
   }
@@ -250,18 +255,25 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
           if (field === "amount") {
             updatedPayment.amount = Number.parseFloat(value || 0)
           } else if (field === "cardInterest") {
-            updatedPayment.cardInterest = Number.parseFloat(value || 0)
+            updatedPayment.cardInterest = value === "" ? "" : Number.parseFloat(value || 0)
           } else if (field === "installments") {
-            updatedPayment.installments = Number.parseInt(value || 1)
+            updatedPayment.installments = value === "" ? "" : Number.parseInt(value || 1)
           } else {
             updatedPayment[field] = value
           }
 
           // Recalcular descripción y clientPaysAmount si es tarjeta
           if (updatedPayment.type === "tarjeta") {
-            const clientPays = calculateClientPaysAmount(updatedPayment.amount, updatedPayment.cardInterest)
-            updatedPayment.description = `Tarjeta: ${formatCurrency(updatedPayment.amount)} + ${updatedPayment.cardInterest}% interés en ${updatedPayment.installments} cuotas. Cliente paga: ${formatCurrency(clientPays)}`
+            const currentAmount = Number.parseFloat(updatedPayment.amount) || 0
+            const currentInterest = Number.parseFloat(updatedPayment.cardInterest) || 0
+            const currentInstallments = Number.parseInt(updatedPayment.installments) || 1
+
+            const clientPays = calculateClientPaysAmount(currentAmount, currentInterest)
+            const amountPerInstallment = clientPays / currentInstallments
+
+            updatedPayment.description = `Tarjeta: ${formatCurrency(currentAmount)} + ${currentInterest}% interés en ${currentInstallments} cuotas. Cliente paga: ${formatCurrency(clientPays)} (${formatCurrency(amountPerInstallment)}/cuota)`
             updatedPayment.clientPaysAmount = clientPays
+            updatedPayment.amountPerInstallment = amountPerInstallment
           }
           return updatedPayment
         }
@@ -335,8 +347,8 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
       type: "efectivo",
       amount: "",
       description: "",
-      cardInterest: 0,
-      installments: 1,
+      cardInterest: "",
+      installments: "",
     })
     setErrors({})
     onClose()
@@ -396,7 +408,7 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
                       <Select
                         value={newPayment.type}
                         onValueChange={(value) =>
-                          setNewPayment((prev) => ({ ...prev, type: value, cardInterest: 0, installments: 1 }))
+                          setNewPayment((prev) => ({ ...prev, type: value, cardInterest: "", installments: "" }))
                         } // Reset card fields on type change
                       >
                         <SelectTrigger className="h-10 border-slate-300 focus:border-slate-800 text-sm bg-slate-50">
@@ -462,41 +474,46 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
                         <p className="text-sm font-medium text-blue-800">Detalles de Tarjeta</p>
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
-                            <Label htmlFor="cardInterest" className="text-xs text-blue-700">
+                            <Label htmlFor="newCardInterest" className="text-xs text-blue-700">
                               Interés (%)
                             </Label>
-                            <Input
-                              id="cardInterest"
-                              type="number"
-                              step="0.01"
-                              min="0"
+                            <NumericFormat
+                              id="newCardInterest"
                               value={newPayment.cardInterest}
-                              onChange={(e) =>
+                              onValueChange={(values) =>
                                 setNewPayment((prev) => ({
                                   ...prev,
-                                  cardInterest: Number.parseFloat(e.target.value) || 0,
+                                  cardInterest: values.value,
                                 }))
                               }
-                              className="h-8 text-xs border-blue-300 focus:border-blue-600 bg-white"
+                              thousandSeparator="."
+                              decimalSeparator=","
+                              decimalScale={2}
+                              fixedDecimalScale={true}
+                              allowNegative={false}
+                              placeholder="0,00"
+                              className="h-8 w-full rounded-md border border-blue-300 bg-white px-3 py-2 text-xs font-medium placeholder:text-blue-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600/20"
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label htmlFor="installments" className="text-xs text-blue-700">
+                            <Label htmlFor="newInstallments" className="text-xs text-blue-700">
                               Cuotas
                             </Label>
-                            <Input
-                              id="installments"
-                              type="number"
-                              step="1"
-                              min="1"
+                            <NumericFormat
+                              id="newInstallments"
                               value={newPayment.installments}
-                              onChange={(e) =>
+                              onValueChange={(values) =>
                                 setNewPayment((prev) => ({
                                   ...prev,
-                                  installments: Number.parseInt(e.target.value) || 1,
+                                  installments: values.value,
                                 }))
                               }
-                              className="h-8 text-xs border-blue-300 focus:border-blue-600 bg-white"
+                              thousandSeparator="."
+                              decimalSeparator=","
+                              allowNegative={false}
+                              allowDecimals={false}
+                              placeholder="1"
+                              className="h-8 w-full rounded-md border border-blue-300 bg-white px-3 py-2 text-xs font-medium placeholder:text-blue-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600/20"
                             />
                           </div>
                         </div>
@@ -504,6 +521,15 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
                           Cliente paga:{" "}
                           {formatCurrency(calculateClientPaysAmount(newPayment.amount, newPayment.cardInterest))}
                         </div>
+                        {(Number.parseInt(newPayment.installments) || 1) > 1 && (
+                          <div className="text-right text-xs text-blue-700 mt-1">
+                            Monto por cuota:{" "}
+                            {formatCurrency(
+                              calculateClientPaysAmount(newPayment.amount, newPayment.cardInterest) /
+                                (Number.parseInt(newPayment.installments) || 1),
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -630,6 +656,8 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
                                     {payment.type === "tarjeta" && payment.clientPaysAmount !== undefined && (
                                       <p className="text-xs text-blue-600 mt-1">
                                         Cliente paga: {formatCurrency(payment.clientPaysAmount)}
+                                        {(payment.installments || 1) > 1 &&
+                                          ` (${formatCurrency(payment.amountPerInstallment)}/cuota)`}
                                       </p>
                                     )}
                                   </div>
@@ -661,26 +689,33 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
                                 <div className="grid grid-cols-2 gap-2 mt-2 text-xs text-slate-600">
                                   <div className="flex items-center gap-1">
                                     <Label className="text-xs">Interés:</Label>
-                                    <Input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
+                                    <NumericFormat
                                       value={payment.cardInterest}
-                                      onChange={(e) => updatePayment(payment.id, "cardInterest", e.target.value)}
-                                      className="h-7 w-16 text-xs border-slate-200"
+                                      onValueChange={(values) =>
+                                        updatePayment(payment.id, "cardInterest", values.value)
+                                      }
+                                      thousandSeparator="."
+                                      decimalSeparator=","
+                                      decimalScale={2}
+                                      fixedDecimalScale={true}
+                                      allowNegative={false}
+                                      className="h-7 w-16 text-xs border-slate-200 rounded px-2"
                                       disabled={loading}
                                     />
                                     <span>%</span>
                                   </div>
                                   <div className="flex items-center gap-1">
                                     <Label className="text-xs">Cuotas:</Label>
-                                    <Input
-                                      type="number"
-                                      step="1"
-                                      min="1"
+                                    <NumericFormat
                                       value={payment.installments}
-                                      onChange={(e) => updatePayment(payment.id, "installments", e.target.value)}
-                                      className="h-7 w-16 text-xs border-slate-200"
+                                      onValueChange={(values) =>
+                                        updatePayment(payment.id, "installments", values.value)
+                                      }
+                                      thousandSeparator="."
+                                      decimalSeparator=","
+                                      allowNegative={false}
+                                      allowDecimals={false}
+                                      className="h-7 w-16 text-xs border-slate-200 rounded px-2"
                                       disabled={loading}
                                     />
                                   </div>

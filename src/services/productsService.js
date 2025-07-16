@@ -55,7 +55,7 @@ export const productsService = {
     }
   },
 
-  // NUEVA FUNCIÓN: Búsqueda específica para modales (sin paginación)
+  // FUNCIÓN: Búsqueda específica para modales (sin paginación)
   search: async (term) => {
     try {
       const response = await apiClient.get(`/products/search?search=${encodeURIComponent(term)}&limit=50`)

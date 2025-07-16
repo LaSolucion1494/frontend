@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Button } from "../components/ui/button"
 import { Input } from "../components/ui/input"
 import { Separator } from "../components/ui/separator"
-import { Badge } from "../components/ui/badge"
+import { Badge } from "@/components/ui/badge"
 import { NumericFormat } from "react-number-format"
 import {
   RefreshCw,
@@ -51,13 +51,14 @@ const Compras = () => {
   const [showProductModal, setShowProductModal] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
 
-  const { products, loading: loadingProducts, fetchProducts } = useProducts()
+  // CAMBIO: Ya no necesitamos products ni fetchProducts del hook
+  const { loading: loadingProducts } = useProducts()
   const { suppliers, loading: loadingSuppliers, fetchSuppliers } = useSuppliers()
   const { loading: loadingPurchase, createPurchase, preparePurchaseDataFromForm } = usePurchases()
   const { config, loading: loadingConfig } = useConfig()
 
   useEffect(() => {
-    fetchProducts()
+    // CAMBIO: Solo cargar proveedores, los productos se buscan en tiempo real
     fetchSuppliers()
   }, [])
 
@@ -100,7 +101,7 @@ const Compras = () => {
     setFormData((prev) => ({ ...prev, subtotal, total }))
   }
 
-  // CORREGIDO: Función para agregar producto al carrito con cantidad especificada
+  // Función para agregar producto al carrito con cantidad especificada
   const addProductToCart = (product, quantity = 1) => {
     const existingProduct = cartProducts.find((p) => p.id === product.id)
     if (existingProduct) {
@@ -108,13 +109,13 @@ const Compras = () => {
     } else {
       const productWithDefaults = {
         ...product,
-        quantity: quantity, // CORREGIDO: Usar la cantidad especificada
+        quantity: quantity,
         precio_costo: product.precio_costo || 0,
-        precio_costo_original: product.precio_costo || 0, // NUEVO: Guardar precio original
+        precio_costo_original: product.precio_costo || 0,
       }
       setCartProducts((prev) => [...prev, productWithDefaults])
     }
-    toast.success(`${product.nombre} agregado al carrito (${quantity} unidades)`) // CORREGIDO: Mostrar cantidad correcta
+    toast.success(`${product.nombre} agregado al carrito (${quantity} unidades)`)
   }
 
   const updateProductQuantity = (productId, newQuantity) => {
@@ -598,11 +599,11 @@ const Compras = () => {
           selectedSupplier={proveedorSeleccionado}
         />
 
+        {/* CAMBIO: El modal ya no recibe products como prop */}
         <PurchaseProductSelectionModal
           isOpen={showProductModal}
           onClose={() => setShowProductModal(false)}
           onProductSelect={addProductToCart}
-          products={products}
           loading={loadingProducts}
         />
 

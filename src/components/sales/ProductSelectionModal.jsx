@@ -49,7 +49,13 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
     performSearch()
   }, [debouncedSearchTerm, searchProducts])
 
-  // Manejar selección de producto
+  // NUEVA FUNCIÓN: Manejar doble clic para selección directa
+  const handleDoubleClick = (product) => {
+    // Simplemente llamar a la misma función que el botón "Agregar"
+    handleSelectProduct(product)
+  }
+
+  // Manejar selección de producto (clic simple - abre modal de cantidad)
   const handleSelectProduct = (product) => {
     if (product.stock <= 0) {
       if (
@@ -193,7 +199,11 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
                     const stockMinimo = product.stock_minimo || 5
 
                     return (
-                      <div key={product.id} className="p-5 hover:bg-slate-50 transition-colors group">
+                      <div
+                        key={product.id}
+                        className="p-5 hover:bg-slate-50 transition-colors group cursor-pointer"
+                        onDoubleClick={() => handleDoubleClick(product)}
+                      >
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between mb-3">
@@ -225,7 +235,10 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
                                 </div>
                               </div>
                               <Button
-                                onClick={() => handleSelectProduct(product)}
+                                onClick={(e) => {
+                                  e.stopPropagation() // Evitar que se dispare el doble clic
+                                  handleSelectProduct(product)
+                                }}
                                 className="ml-4 bg-slate-800 hover:bg-slate-700 text-white opacity-0 group-hover:opacity-100 transition-opacity"
                                 size="sm"
                                 disabled={isSearching || externalLoading}
@@ -283,7 +296,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
                   <Package className="w-16 h-16 mx-auto mb-4 text-slate-300" />
                   <h3 className="font-medium text-lg mb-2">No se encontraron productos</h3>
                   <p className="text-sm text-slate-400 mb-2">No hay productos que coincidan con "{searchTerm}"</p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-400 mb-2">
                     Intente con otros términos de búsqueda o verifique la ortografía
                   </p>
                 </div>
@@ -295,7 +308,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
                     Use el campo de búsqueda para encontrar productos por nombre, código o marca
                   </p>
                   <p className="text-xs text-slate-400 mb-2">
-                    La búsqueda se realiza en toda la base de datos, no solo en la página actual
+                    <strong>Doble clic</strong> en cualquier producto o use el botón "Agregar" para seleccionar
                   </p>
                   <p className="text-xs text-slate-400">
                     Los productos sin stock aparecerán marcados y requerirán confirmación

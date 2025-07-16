@@ -355,7 +355,7 @@ export const salesService = {
         cantidad: Number.parseInt(product.cantidad),
         precioUnitario: Number.parseFloat(product.precioUnitario),
         precio_original: Number.parseFloat(product.precio_original || product.precioUnitario),
-        discount_percentage: product.discount_percentage || 0,
+        discount_percentage: product.discount_active ? product.discount_percentage : 0,
       })),
       subtotal: Number.parseFloat(saleData.subtotal),
       descuento: Number.parseFloat(saleData.descuento || 0),
@@ -442,7 +442,7 @@ export const salesService = {
       case "cuenta_corriente":
         return { label: "Cuenta Corriente", icon: "Wallet" }
       case "otro":
-        return { label: "Otro", icon: "DollarSign" }
+        return { label: "Otro", icon: "HelpCircle" }
       default:
         return { label: tipo, icon: "HelpCircle" }
     }

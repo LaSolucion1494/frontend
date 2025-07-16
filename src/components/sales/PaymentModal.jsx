@@ -23,7 +23,6 @@ import {
   ShoppingCart,
   X,
 } from "lucide-react"
-import toast from "react-hot-toast"
 
 const PAYMENT_TYPES = [
   {
@@ -149,27 +148,49 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
 
   // Agregar nuevo pago
   const addPayment = () => {
+    // Las validaciones de toast se eliminan aquí, se confía en validatePayments para los errores visuales
     if (!newPayment.amount || Number.parseFloat(newPayment.amount) <= 0) {
-      toast.error("Ingrese un monto válido")
+      setErrors((prev) => ({ ...prev, newPaymentAmount: "Ingrese un monto válido" }))
       return
+    } else {
+      setErrors((prev) => {
+        const { newPaymentAmount, ...rest } = prev
+        return rest
+      })
     }
 
     if (!newPayment.type) {
-      toast.error("Seleccione un tipo de pago")
+      setErrors((prev) => ({ ...prev, newPaymentType: "Seleccione un tipo de pago" }))
       return
+    } else {
+      setErrors((prev) => {
+        const { newPaymentType, ...rest } = prev
+        return rest
+      })
     }
 
     // Validaciones específicas para cuenta corriente
     if (newPayment.type === "cuenta_corriente") {
       if (!selectedClient) {
-        toast.error("Para pagar con cuenta corriente debe seleccionar un cliente registrado")
+        setErrors((prev) => ({
+          ...prev,
+          newPaymentCC: "Para pagar con cuenta corriente debe seleccionar un cliente registrado",
+        }))
         return
       }
 
       if (clientInfo && !clientInfo.tiene_cuenta_corriente) {
-        toast.error("El cliente seleccionado no tiene cuenta corriente habilitada")
+        setErrors((prev) => ({
+          ...prev,
+          newPaymentCC: "El cliente seleccionado no tiene cuenta corriente habilitada",
+        }))
         return
       }
+    } else {
+      setErrors((prev) => {
+        const { newPaymentCC, ...rest } = prev
+        return rest
+      })
     }
 
     const payment = {
@@ -185,7 +206,7 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
       amount: "",
       description: "",
     })
-    setErrors({})
+    setErrors({}) // Limpiar errores después de agregar un pago exitosamente
   }
 
   // Eliminar pago
@@ -217,6 +238,8 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
     return new Intl.NumberFormat("es-AR", {
       style: "currency",
       currency: "ARS",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(amount || 0)
   }
 
@@ -228,6 +251,7 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
   // Manejar confirmación
   const handleConfirm = () => {
     if (!validatePayments()) {
+      // validatePayments ya establece los errores en el estado 'errors'
       return
     }
 
@@ -351,6 +375,12 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
                           })}
                         </SelectContent>
                       </Select>
+                      {errors.newPaymentType && (
+                        <p className="text-xs text-red-600 flex items-center">
+                          <AlertCircle className="w-3 h-3 mr-1" />
+                          {errors.newPaymentType}
+                        </p>
+                      )}
                     </div>
 
                     {/* Monto */}
@@ -370,6 +400,12 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
                         />
                         <DollarSign className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
                       </div>
+                      {errors.newPaymentAmount && (
+                        <p className="text-xs text-red-600 flex items-center">
+                          <AlertCircle className="w-3 h-3 mr-1" />
+                          {errors.newPaymentAmount}
+                        </p>
+                      )}
                     </div>
 
                     {/* Descripción */}
@@ -382,6 +418,12 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
                         className="h-10 border-slate-300 focus:border-slate-800 text-sm bg-slate-50"
                       />
                     </div>
+                    {errors.newPaymentCC && (
+                      <p className="text-xs text-red-600 flex items-center">
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        {errors.newPaymentCC}
+                      </p>
+                    )}
 
                     {/* Botones */}
                     <div className="flex gap-2 pt-2">

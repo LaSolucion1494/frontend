@@ -196,7 +196,7 @@ const Ventas = () => {
       const saleData = prepareSaleDataFromForm(formData, cartProducts, payments, clienteSeleccionado)
       saleData.tipoFactura = formData.tipoFactura
 
-      const result = await createSale(saleData)
+      const result = await createSale(saleData) // createSale ya maneja sus propios toasts de éxito/error
 
       if (result.success) {
         setShowPaymentModal(false)
@@ -206,7 +206,7 @@ const Ventas = () => {
         if (saleId) {
           setTimeout(async () => {
             try {
-              const saleDetails = await getSaleById(saleId)
+              const saleDetails = await getSaleById(saleId) // getSaleById ya maneja sus propios toasts de error
 
               if (saleDetails.success) {
                 setCompletedSale({
@@ -216,27 +216,27 @@ const Ventas = () => {
                 setShowInvoiceModal(true)
               } else {
                 console.error("Error al obtener detalles de venta:", saleDetails.message)
-                toast.error("Venta creada pero no se pudo generar la factura")
+                toast.error("Venta creada pero no se pudo generar la factura") // Este toast es específico para el fallo de getSaleById
               }
             } catch (error) {
               console.error("Error al obtener detalles de venta:", error)
-              toast.error("Venta creada pero no se pudo generar la factura")
+              toast.error("Venta creada pero no se pudo generar la factura") // Este toast es específico para el fallo de getSaleById
             }
           }, 500)
         } else {
           console.error("No se pudo obtener el ID de venta")
-          toast.error("Venta creada pero no se pudo generar la factura")
+          toast.error("Venta creada pero no se pudo generar la factura") // Este toast es específico si no hay ID
         }
 
         clearCart()
-        toast.success("Venta registrada exitosamente")
+        // No se necesita toast.success("Venta registrada exitosamente") aquí, ya lo maneja useSales
       } else {
+        // No se necesita toast.error(result.message || "Error al registrar la venta") aquí, ya lo maneja useSales
         console.error("Error al crear venta:", result.message)
-        toast.error(result.message || "Error al registrar la venta")
       }
     } catch (error) {
       console.error("Error al procesar la venta:", error)
-      toast.error("Error inesperado al procesar la venta")
+      // No se necesita toast.error("Error inesperado al procesar la venta") aquí, ya lo maneja useSales
     }
   }
 

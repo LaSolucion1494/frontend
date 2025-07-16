@@ -47,7 +47,7 @@ import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert"
 import { useNavigate } from "react-router-dom"
 import Pagination from "../components/ui/Pagination"
 import { Loading, LoadingOverlay } from "../components/ui/loading"
-import { toast } from "react-toastify" // Importar toast para mostrar mensajes
+import { toast } from "react-hot-toast" // Importar toast para mostrar mensajes
 
 const ReporteVentas = () => {
   const navigate = useNavigate()

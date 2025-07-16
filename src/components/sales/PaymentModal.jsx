@@ -68,6 +68,8 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
     type: "efectivo",
     amount: "",
     description: "",
+    cardInterest: 0, // Nuevo estado para interés de tarjeta
+    installments: 1, // Nuevo estado para cuotas
   })
   const [errors, setErrors] = useState({})
 
@@ -82,10 +84,19 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
         type: "efectivo",
         amount: "",
         description: "",
+        cardInterest: 0,
+        installments: 1,
       })
       setErrors({})
     }
   }, [isOpen, total])
+
+  // Calcular el monto que el cliente pagaría con interés
+  const calculateClientPaysAmount = (amount, interest) => {
+    const baseAmount = Number.parseFloat(amount) || 0
+    const interestRate = Number.parseFloat(interest) || 0
+    return baseAmount * (1 + interestRate / 100)
+  }
 
   // Calcular totales
   const totalPaid = payments.reduce((sum, payment) => sum + Number.parseFloat(payment.amount || 0), 0)
@@ -193,11 +204,24 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
       })
     }
 
+    let description = newPayment.description || getDefaultDescription(newPayment.type)
+    if (newPayment.type === "tarjeta") {
+      const clientPays = calculateClientPaysAmount(newPayment.amount, newPayment.cardInterest)
+      description = `Tarjeta: ${formatCurrency(newPayment.amount)} + ${newPayment.cardInterest}% interés en ${newPayment.installments} cuotas. Cliente paga: ${formatCurrency(clientPays)}`
+    }
+
     const payment = {
       id: Date.now(),
       type: newPayment.type,
       amount: Number.parseFloat(newPayment.amount),
-      description: newPayment.description || getDefaultDescription(newPayment.type),
+      description: description,
+      // Guardar estos campos para referencia visual en el listado de pagos del modal
+      cardInterest: newPayment.type === "tarjeta" ? newPayment.cardInterest : undefined,
+      installments: newPayment.type === "tarjeta" ? newPayment.installments : undefined,
+      clientPaysAmount:
+        newPayment.type === "tarjeta"
+          ? calculateClientPaysAmount(newPayment.amount, newPayment.cardInterest)
+          : undefined,
     }
 
     setPayments((prev) => [...prev, payment])
@@ -205,6 +229,8 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
       type: "efectivo",
       amount: "",
       description: "",
+      cardInterest: 0,
+      installments: 1,
     })
     setErrors({}) // Limpiar errores después de agregar un pago exitosamente
   }
@@ -218,11 +244,29 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
   // Actualizar pago existente
   const updatePayment = (paymentId, field, value) => {
     setPayments((prev) =>
-      prev.map((payment) =>
-        payment.id === paymentId
-          ? { ...payment, [field]: field === "amount" ? Number.parseFloat(value || 0) : value }
-          : payment,
-      ),
+      prev.map((payment) => {
+        if (payment.id === paymentId) {
+          const updatedPayment = { ...payment }
+          if (field === "amount") {
+            updatedPayment.amount = Number.parseFloat(value || 0)
+          } else if (field === "cardInterest") {
+            updatedPayment.cardInterest = Number.parseFloat(value || 0)
+          } else if (field === "installments") {
+            updatedPayment.installments = Number.parseInt(value || 1)
+          } else {
+            updatedPayment[field] = value
+          }
+
+          // Recalcular descripción y clientPaysAmount si es tarjeta
+          if (updatedPayment.type === "tarjeta") {
+            const clientPays = calculateClientPaysAmount(updatedPayment.amount, updatedPayment.cardInterest)
+            updatedPayment.description = `Tarjeta: ${formatCurrency(updatedPayment.amount)} + ${updatedPayment.cardInterest}% interés en ${updatedPayment.installments} cuotas. Cliente paga: ${formatCurrency(clientPays)}`
+            updatedPayment.clientPaysAmount = clientPays
+          }
+          return updatedPayment
+        }
+        return payment
+      }),
     )
     setErrors({})
   }
@@ -291,6 +335,8 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
       type: "efectivo",
       amount: "",
       description: "",
+      cardInterest: 0,
+      installments: 1,
     })
     setErrors({})
     onClose()
@@ -349,7 +395,9 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
                       <Label className="text-sm font-medium text-slate-700">Método de Pago</Label>
                       <Select
                         value={newPayment.type}
-                        onValueChange={(value) => setNewPayment((prev) => ({ ...prev, type: value }))}
+                        onValueChange={(value) =>
+                          setNewPayment((prev) => ({ ...prev, type: value, cardInterest: 0, installments: 1 }))
+                        } // Reset card fields on type change
                       >
                         <SelectTrigger className="h-10 border-slate-300 focus:border-slate-800 text-sm bg-slate-50">
                           <SelectValue placeholder="Seleccionar método" />
@@ -408,6 +456,57 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
                       )}
                     </div>
 
+                    {/* Campos de interés y cuotas para Tarjeta */}
+                    {newPayment.type === "tarjeta" && (
+                      <div className="space-y-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm font-medium text-blue-800">Detalles de Tarjeta</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="cardInterest" className="text-xs text-blue-700">
+                              Interés (%)
+                            </Label>
+                            <Input
+                              id="cardInterest"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={newPayment.cardInterest}
+                              onChange={(e) =>
+                                setNewPayment((prev) => ({
+                                  ...prev,
+                                  cardInterest: Number.parseFloat(e.target.value) || 0,
+                                }))
+                              }
+                              className="h-8 text-xs border-blue-300 focus:border-blue-600 bg-white"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="installments" className="text-xs text-blue-700">
+                              Cuotas
+                            </Label>
+                            <Input
+                              id="installments"
+                              type="number"
+                              step="1"
+                              min="1"
+                              value={newPayment.installments}
+                              onChange={(e) =>
+                                setNewPayment((prev) => ({
+                                  ...prev,
+                                  installments: Number.parseInt(e.target.value) || 1,
+                                }))
+                              }
+                              className="h-8 text-xs border-blue-300 focus:border-blue-600 bg-white"
+                            />
+                          </div>
+                        </div>
+                        <div className="text-right text-sm text-blue-800 font-semibold">
+                          Cliente paga:{" "}
+                          {formatCurrency(calculateClientPaysAmount(newPayment.amount, newPayment.cardInterest))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Descripción */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-slate-700">Descripción (opcional)</Label>
@@ -459,7 +558,7 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
                           <p className="text-sm font-medium text-slate-900">Cliente Seleccionado</p>
                           <p className="text-sm text-slate-700">{clientInfo.nombre}</p>
 
-                          {clientInfo.tiene_cuenta_corriente && (
+                          {clientInfo.tiene_cuenta_corriente ? (
                             <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
                               <div className="flex items-center space-x-2">
                                 <Building2 className="w-3 h-3 text-orange-600" />
@@ -488,7 +587,7 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
                                 )}
                               </div>
                             </div>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     </CardContent>
@@ -528,6 +627,11 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
                                   <div className="flex-1 min-w-0">
                                     <p className="font-medium text-sm text-slate-800 truncate">{config.label}</p>
                                     <p className="text-xs text-slate-600 truncate">{payment.description}</p>
+                                    {payment.type === "tarjeta" && payment.clientPaysAmount !== undefined && (
+                                      <p className="text-xs text-blue-600 mt-1">
+                                        Cliente paga: {formatCurrency(payment.clientPaysAmount)}
+                                      </p>
+                                    )}
                                   </div>
                                 </div>
                                 <div className="flex items-center space-x-2 ml-3">
@@ -553,6 +657,35 @@ const PaymentModal = ({ isOpen, onClose, total, onConfirm, selectedClient = null
                                   </Button>
                                 </div>
                               </div>
+                              {payment.type === "tarjeta" && (
+                                <div className="grid grid-cols-2 gap-2 mt-2 text-xs text-slate-600">
+                                  <div className="flex items-center gap-1">
+                                    <Label className="text-xs">Interés:</Label>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={payment.cardInterest}
+                                      onChange={(e) => updatePayment(payment.id, "cardInterest", e.target.value)}
+                                      className="h-7 w-16 text-xs border-slate-200"
+                                      disabled={loading}
+                                    />
+                                    <span>%</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Label className="text-xs">Cuotas:</Label>
+                                    <Input
+                                      type="number"
+                                      step="1"
+                                      min="1"
+                                      value={payment.installments}
+                                      onChange={(e) => updatePayment(payment.id, "installments", e.target.value)}
+                                      className="h-7 w-16 text-xs border-slate-200"
+                                      disabled={loading}
+                                    />
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )
                         })}

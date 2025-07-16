@@ -252,9 +252,10 @@ const Ventas = () => {
   const handleInterestDiscountChange = (values) => {
     const value = Number.parseFloat(values.value) || 0
     let adjustment = 0
+    const subtotal = cartProducts.reduce((sum, product) => sum + product.quantity * product.precio_venta, 0)
 
     if (formData.interestDiscountType === "percentage") {
-      adjustment = (formData.subtotal * value) / 100
+      adjustment = (subtotal * value) / 100
     } else {
       adjustment = value
     }
@@ -263,7 +264,7 @@ const Ventas = () => {
       adjustment = -adjustment
     }
 
-    const total = Math.max(0, formData.subtotal + adjustment)
+    const total = Math.max(0, subtotal + adjustment)
     setFormData((prev) => ({
       ...prev,
       interestDiscount: values.value,

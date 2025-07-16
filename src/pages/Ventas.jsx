@@ -23,13 +23,13 @@ import {
   Building2,
   Search,
   FileText,
+  Receipt,
 } from "lucide-react"
 import ClientSelectionModal from "../components/sales/ClientSelectionModal"
 import ProductSelectionModal from "../components/sales/ProductSelectionModal"
 import PaymentModal from "../components/sales/PaymentModal"
 import InvoicePrintModal from "../components/sales/InvoicePrintModal"
 import ProductCard from "../components/sales/ProductCard"
-import SaleTypeToggle from "../components/sales/SaleTypeToggle"
 import { useProducts } from "../hooks/useProducts"
 import { useClients } from "../hooks/useClients"
 import { useSales } from "../hooks/useSales"
@@ -187,6 +187,15 @@ const Ventas = () => {
     })
   }
 
+  const handleSaleTypeChange = (newType) => {
+    if (cartProducts.length > 0) {
+      toast.error("No se puede cambiar el tipo de operación con productos en el carrito")
+      return
+    }
+    setSaleType(newType)
+    toast.success(`Cambiado a modo ${newType === "venta" ? "Venta" : "Presupuesto"}`)
+  }
+
   const handlePaymentConfirm = async (payments) => {
     if (cartProducts.length === 0) {
       toast.error("Debe agregar al menos un producto")
@@ -325,31 +334,92 @@ const Ventas = () => {
   return (
     <Layout>
       <div className="max-w-[95rem] mx-auto px-4 py-6 min-h-screen">
+        {/* Header con Toggle Integrado */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <div
+                  className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                    saleType === "venta" ? "bg-slate-800" : "bg-purple-600"
+                  }`}
+                >
+                  {saleType === "venta" ? (
+                    <Receipt className="w-5 h-5 text-white" />
+                  ) : (
+                    <FileText className="w-5 h-5 text-white" />
+                  )}
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">
+                    {saleType === "venta" ? "Nueva Venta" : "Nuevo Presupuesto"}
+                  </h1>
+                  <p className="text-sm text-gray-600">
+                    {saleType === "venta"
+                      ? "Procesa ventas con facturación y afectación de stock"
+                      : "Crea presupuestos sin factura pero con afectación de stock"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Toggle Minimalista */}
+            <div className="flex items-center space-x-3">
+              <span className="text-sm font-medium text-gray-700">Tipo de operación:</span>
+              <div className="flex rounded-lg border border-gray-200 p-1 bg-white shadow-sm">
+                <button
+                  onClick={() => handleSaleTypeChange("venta")}
+                  disabled={isLoading || cartProducts.length > 0}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 flex items-center space-x-2 ${
+                    saleType === "venta"
+                      ? "bg-slate-800 text-white shadow-sm"
+                      : "text-gray-600 hover:text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                  }`}
+                >
+                  <Receipt className="w-4 h-4" />
+                  <span>Venta</span>
+                </button>
+                <button
+                  onClick={() => handleSaleTypeChange("presupuesto")}
+                  disabled={isLoading || cartProducts.length > 0}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 flex items-center space-x-2 ${
+                    saleType === "presupuesto"
+                      ? "bg-purple-600 text-white shadow-sm"
+                      : "text-gray-600 hover:text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                  }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Presupuesto</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Indicador de estado cuando hay productos */}
+          {cartProducts.length > 0 && (
+            <div
+              className={`mt-4 p-3 rounded-lg border-l-4 ${
+                saleType === "venta"
+                  ? "bg-blue-50 border-blue-400 text-blue-800"
+                  : "bg-purple-50 border-purple-400 text-purple-800"
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${saleType === "venta" ? "bg-blue-400" : "bg-purple-400"}`}></div>
+                <span className="text-sm font-medium">
+                  Modo {saleType === "venta" ? "Venta" : "Presupuesto"} activo
+                </span>
+                <span className="text-xs opacity-75">
+                  • {cartProducts.length} producto{cartProducts.length !== 1 ? "s" : ""} en carrito
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Columna Principal */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Toggle de Tipo de Operación */}
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-6">
-                <SaleTypeToggle
-                  saleType={saleType}
-                  onSaleTypeChange={setSaleType}
-                  disabled={isLoading || cartProducts.length > 0}
-                />
-                {saleType === "presupuesto" && (
-                  <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <FileText className="w-4 h-4 text-purple-600" />
-                      <span className="text-sm font-medium text-purple-800">Modo Presupuesto Activo</span>
-                    </div>
-                    <p className="text-xs text-purple-700 mt-1">
-                      No se generará factura ni se afectará el stock. Solo se creará un presupuesto para el cliente.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
             {/* Cliente */}
             <Card className="border-0 shadow-sm">
               <CardHeader className="pb-4 bg-slate-800">

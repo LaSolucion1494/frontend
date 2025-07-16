@@ -29,15 +29,18 @@ import ProductSelectionModal from "../components/sales/ProductSelectionModal"
 import PaymentModal from "../components/sales/PaymentModal"
 import InvoicePrintModal from "../components/sales/InvoicePrintModal"
 import ProductCard from "../components/sales/ProductCard"
+import SaleTypeToggle from "../components/sales/SaleTypeToggle"
 import { useProducts } from "../hooks/useProducts"
 import { useClients } from "../hooks/useClients"
 import { useSales } from "../hooks/useSales"
+import { usePresupuestos } from "../hooks/usePresupuestos"
 import { useConfig } from "../hooks/useConfig"
 import toast from "react-hot-toast"
 
 const Ventas = () => {
   const [cartProducts, setCartProducts] = useState([])
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
+  const [saleType, setSaleType] = useState("venta") // "venta" o "presupuesto"
   const [formData, setFormData] = useState({
     subtotal: 0,
     interestDiscount: 0,
@@ -54,14 +57,18 @@ const Ventas = () => {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [completedSale, setCompletedSale] = useState(null)
 
-  // CAMBIO: Ya no necesitamos products ni fetchProducts del hook
   const { loading: loadingProducts } = useProducts()
   const { clients, loading: loadingClients, fetchClients } = useClients()
   const { loading: loadingSale, createSale, prepareSaleDataFromForm, getSaleById } = useSales()
+  const {
+    loading: loadingPresupuesto,
+    createPresupuesto,
+    preparePresupuestoDataFromForm,
+    getPresupuestoById,
+  } = usePresupuestos()
   const { config, loading: loadingConfig } = useConfig()
 
   useEffect(() => {
-    // CAMBIO: Solo cargar clientes, los productos se buscan en tiempo real
     fetchClients()
   }, [])
 
@@ -85,7 +92,6 @@ const Ventas = () => {
   }, [cartProducts, formData.interestDiscount, formData.interestDiscountType, formData.isInterest])
 
   const calculateTotals = () => {
-    // Cálculo simplificado - solo suma los precios finales de los productos
     const subtotal = cartProducts.reduce((sum, product) => sum + product.quantity * product.precio_venta, 0)
 
     let adjustment = 0
@@ -105,7 +111,6 @@ const Ventas = () => {
     setFormData((prev) => ({ ...prev, subtotal, total }))
   }
 
-  // Función simplificada para agregar producto al carrito
   const addProductToCart = (product, quantity = 1) => {
     const existingProduct = cartProducts.find((p) => p.id === product.id)
     if (existingProduct) {
@@ -194,50 +199,63 @@ const Ventas = () => {
     }
 
     try {
-      const saleData = prepareSaleDataFromForm(formData, cartProducts, payments, clienteSeleccionado)
-      saleData.tipoFactura = formData.tipoFactura
+      if (saleType === "venta") {
+        // Procesar como venta normal
+        const saleData = prepareSaleDataFromForm(formData, cartProducts, payments, clienteSeleccionado)
+        saleData.tipoFactura = formData.tipoFactura
 
-      const result = await createSale(saleData) // createSale ya maneja sus propios toasts de éxito/error
+        const result = await createSale(saleData)
 
-      if (result.success) {
-        setShowPaymentModal(false)
+        if (result.success) {
+          setShowPaymentModal(false)
 
-        const saleId = result.data?.data?.id || result.data?.id
+          const saleId = result.data?.data?.id || result.data?.id
 
-        if (saleId) {
-          setTimeout(async () => {
-            try {
-              const saleDetails = await getSaleById(saleId) // getSaleById ya maneja sus propios toasts de error
+          if (saleId) {
+            setTimeout(async () => {
+              try {
+                const saleDetails = await getSaleById(saleId)
 
-              if (saleDetails.success) {
-                setCompletedSale({
-                  ...saleDetails.data,
-                  tipoFactura: formData.tipoFactura,
-                })
-                setShowInvoiceModal(true)
-              } else {
-                console.error("Error al obtener detalles de venta:", saleDetails.message)
-                toast.error("Venta creada pero no se pudo generar la factura") // Este toast es específico para el fallo de getSaleById
+                if (saleDetails.success) {
+                  setCompletedSale({
+                    ...saleDetails.data,
+                    tipoFactura: formData.tipoFactura,
+                  })
+                  setShowInvoiceModal(true)
+                } else {
+                  console.error("Error al obtener detalles de venta:", saleDetails.message)
+                  toast.error("Venta creada pero no se pudo generar la factura")
+                }
+              } catch (error) {
+                console.error("Error al obtener detalles de venta:", error)
+                toast.error("Venta creada pero no se pudo generar la factura")
               }
-            } catch (error) {
-              console.error("Error al obtener detalles de venta:", error)
-              toast.error("Venta creada pero no se pudo generar la factura") // Este toast es específico para el fallo de getSaleById
-            }
-          }, 500)
-        } else {
-          console.error("No se pudo obtener el ID de venta")
-          toast.error("Venta creada pero no se pudo generar la factura") // Este toast es específico si no hay ID
-        }
+            }, 500)
+          } else {
+            console.error("No se pudo obtener el ID de venta")
+            toast.error("Venta creada pero no se pudo generar la factura")
+          }
 
-        clearCart()
-        // No se necesita toast.success("Venta registrada exitosamente") aquí, ya lo maneja useSales
+          clearCart()
+        } else {
+          console.error("Error al crear venta:", result.message)
+        }
       } else {
-        // No se necesita toast.error(result.message || "Error al registrar la venta") aquí, ya lo maneja useSales
-        console.error("Error al crear venta:", result.message)
+        // Procesar como presupuesto
+        const presupuestoData = preparePresupuestoDataFromForm(formData, cartProducts, payments, clienteSeleccionado)
+
+        const result = await createPresupuesto(presupuestoData)
+
+        if (result.success) {
+          setShowPaymentModal(false)
+          clearCart()
+          // No mostrar modal de factura para presupuestos
+        } else {
+          console.error("Error al crear presupuesto:", result.message)
+        }
       }
     } catch (error) {
-      console.error("Error al procesar la venta:", error)
-      // No se necesita toast.error("Error inesperado al procesar la venta") aquí, ya lo maneja useSales
+      console.error("Error al procesar la operación:", error)
     }
   }
 
@@ -289,6 +307,8 @@ const Ventas = () => {
     return !!clienteSeleccionado && cartProducts.length > 0
   }
 
+  const isLoading = saleType === "venta" ? loadingSale : loadingPresupuesto
+
   if (loadingConfig) {
     return (
       <Layout>
@@ -308,6 +328,28 @@ const Ventas = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Columna Principal */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Toggle de Tipo de Operación */}
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-6">
+                <SaleTypeToggle
+                  saleType={saleType}
+                  onSaleTypeChange={setSaleType}
+                  disabled={isLoading || cartProducts.length > 0}
+                />
+                {saleType === "presupuesto" && (
+                  <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <FileText className="w-4 h-4 text-purple-600" />
+                      <span className="text-sm font-medium text-purple-800">Modo Presupuesto Activo</span>
+                    </div>
+                    <p className="text-xs text-purple-700 mt-1">
+                      No se generará factura ni se afectará el stock. Solo se creará un presupuesto para el cliente.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Cliente */}
             <Card className="border-0 shadow-sm">
               <CardHeader className="pb-4 bg-slate-800">
@@ -351,7 +393,7 @@ const Ventas = () => {
                             )}
                           </div>
                         ) : null}
-                        {clienteSeleccionado.tiene_cuenta_corriente ? (
+                        {clienteSeleccionado.tiene_cuenta_corriente && saleType === "venta" ? (
                           <div className="flex items-center mt-2">
                             <Building2 className="w-4 h-4 mr-1 text-orange-600" />
                             <span className="text-sm text-orange-700 font-medium">Cuenta Corriente</span>
@@ -367,7 +409,7 @@ const Ventas = () => {
                         ) : null}
                         {clienteSeleccionado.id === 1 && (
                           <Badge variant="outline" className="mt-2 text-xs bg-blue-100 text-blue-700 border-blue-300">
-                            Venta rápida
+                            {saleType === "venta" ? "Venta rápida" : "Presupuesto rápido"}
                           </Badge>
                         )}
                       </div>
@@ -450,44 +492,47 @@ const Ventas = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0 space-y-6 -mt-4">
-                  {/* Tipo de Factura */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700 flex items-center">
-                        <FileText className="w-4 h-4 mr-1.5 text-gray-600" />
-                        Tipo de Factura
-                      </span>
-                      <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
-                        <button
-                          onClick={() => setFormData((prev) => ({ ...prev, tipoFactura: "B" }))}
-                          className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
-                            formData.tipoFactura === "B"
-                              ? "bg-slate-800 text-white shadow-sm"
-                              : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"
-                          }`}
-                        >
-                          Factura B
-                        </button>
-                        <button
-                          onClick={() => setFormData((prev) => ({ ...prev, tipoFactura: "A" }))}
-                          className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
-                            formData.tipoFactura === "A"
-                              ? "bg-slate-800 text-white shadow-sm"
-                              : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"
-                          }`}
-                        >
-                          Factura A
-                        </button>
+                  {/* Tipo de Factura - Solo para ventas */}
+                  {saleType === "venta" && (
+                    <>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-700 flex items-center">
+                            <FileText className="w-4 h-4 mr-1.5 text-gray-600" />
+                            Tipo de Factura
+                          </span>
+                          <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+                            <button
+                              onClick={() => setFormData((prev) => ({ ...prev, tipoFactura: "B" }))}
+                              className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
+                                formData.tipoFactura === "B"
+                                  ? "bg-slate-800 text-white shadow-sm"
+                                  : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"
+                              }`}
+                            >
+                              Factura B
+                            </button>
+                            <button
+                              onClick={() => setFormData((prev) => ({ ...prev, tipoFactura: "A" }))}
+                              className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
+                                formData.tipoFactura === "A"
+                                  ? "bg-slate-800 text-white shadow-sm"
+                                  : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"
+                              }`}
+                            >
+                              Factura A
+                            </button>
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                          {formData.tipoFactura === "A"
+                            ? "Factura A: IVA discriminado (para responsables inscriptos)"
+                            : "Factura B: IVA incluido (para consumidores finales)"}
+                        </div>
                       </div>
-                    </div>
-                    <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                      {formData.tipoFactura === "A"
-                        ? "Factura A: IVA discriminado (para responsables inscriptos)"
-                        : "Factura B: IVA incluido (para consumidores finales)"}
-                    </div>
-                  </div>
-
-                  <Separator />
+                      <Separator />
+                    </>
+                  )}
 
                   {/* Subtotal */}
                   <div className="flex justify-between items-center py-2">
@@ -495,7 +540,7 @@ const Ventas = () => {
                     <span className="font-semibold text-gray-900 text-lg">{formatCurrency(formData.subtotal)}</span>
                   </div>
 
-                  {/* Ajustes adicionales (descuento/interés general) */}
+                  {/* Ajustes adicionales */}
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-gray-700">Ajustes Adicionales</span>
@@ -588,11 +633,24 @@ const Ventas = () => {
                   <Button
                     onClick={() => setShowPaymentModal(true)}
                     disabled={!canProcessPayment()}
-                    className="w-full bg-slate-800 hover:bg-slate-900 text-white h-12 text-base font-semibold rounded-lg disabled:opacity-50"
+                    className={`w-full h-12 text-base font-semibold rounded-lg disabled:opacity-50 ${
+                      saleType === "venta"
+                        ? "bg-slate-800 hover:bg-slate-900 text-white"
+                        : "bg-purple-600 hover:bg-purple-700 text-white"
+                    }`}
                     size="lg"
                   >
-                    <CreditCard className="w-5 h-5 mr-2" />
-                    Procesar Pago
+                    {saleType === "venta" ? (
+                      <>
+                        <CreditCard className="w-5 h-5 mr-2" />
+                        Procesar Pago
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-5 h-5 mr-2" />
+                        Crear Presupuesto
+                      </>
+                    )}
                   </Button>
 
                   {/* Acciones Secundarias */}
@@ -611,16 +669,32 @@ const Ventas = () => {
 
               {/* Información Adicional */}
               {canProcessPayment() && (
-                <Card className="border-0 shadow-sm bg-blue-50 border-blue-100 mt-4">
+                <Card
+                  className={`border-0 shadow-sm mt-4 ${
+                    saleType === "venta" ? "bg-blue-50 border-blue-100" : "bg-purple-50 border-purple-100"
+                  }`}
+                >
                   <CardContent className="p-4">
                     <div className="flex items-start space-x-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                        <Check className="w-4 h-4 text-blue-600" />
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          saleType === "venta" ? "bg-blue-100" : "bg-purple-100"
+                        }`}
+                      >
+                        <Check className={`w-4 h-4 ${saleType === "venta" ? "text-blue-600" : "text-purple-600"}`} />
                       </div>
                       <div>
-                        <h4 className="font-medium text-blue-900 text-sm">Todo listo</h4>
-                        <p className="text-blue-700 text-xs mt-1">
-                          La venta está completa y lista para procesar el pago.
+                        <h4
+                          className={`font-medium text-sm ${
+                            saleType === "venta" ? "text-blue-900" : "text-purple-900"
+                          }`}
+                        >
+                          Todo listo
+                        </h4>
+                        <p className={`text-xs mt-1 ${saleType === "venta" ? "text-blue-700" : "text-purple-700"}`}>
+                          {saleType === "venta"
+                            ? "La venta está completa y lista para procesar el pago."
+                            : "El presupuesto está completo y listo para ser creado."}
                         </p>
                       </div>
                     </div>
@@ -639,7 +713,6 @@ const Ventas = () => {
           selectedClient={clienteSeleccionado}
         />
 
-        {/* CAMBIO: El modal ya no recibe products como prop */}
         <ProductSelectionModal
           isOpen={showProductModal}
           onClose={() => setShowProductModal(false)}
@@ -654,16 +727,20 @@ const Ventas = () => {
           onConfirm={handlePaymentConfirm}
           selectedClient={clienteSeleccionado?.tipo !== "consumidor_final" ? clienteSeleccionado?.id : null}
           clients={clients}
-          loading={loadingSale}
+          loading={isLoading}
+          saleType={saleType}
         />
 
-        <InvoicePrintModal
-          isOpen={showInvoiceModal}
-          onClose={() => setShowInvoiceModal(false)}
-          saleData={completedSale}
-          config={config}
-          tipoFactura={completedSale?.tipoFactura || "B"}
-        />
+        {/* Solo mostrar modal de factura para ventas */}
+        {saleType === "venta" && (
+          <InvoicePrintModal
+            isOpen={showInvoiceModal}
+            onClose={() => setShowInvoiceModal(false)}
+            saleData={completedSale}
+            config={config}
+            tipoFactura={completedSale?.tipoFactura || "B"}
+          />
+        )}
       </div>
     </Layout>
   )

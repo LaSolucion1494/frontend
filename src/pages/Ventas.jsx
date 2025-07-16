@@ -54,13 +54,14 @@ const Ventas = () => {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [completedSale, setCompletedSale] = useState(null)
 
-  const { products, loading: loadingProducts, fetchProducts, updateFilters, pagination } = useProducts()
+  // CAMBIO: Ya no necesitamos products ni fetchProducts del hook
+  const { loading: loadingProducts } = useProducts()
   const { clients, loading: loadingClients, fetchClients } = useClients()
   const { loading: loadingSale, createSale, prepareSaleDataFromForm, getSaleById } = useSales()
   const { config, loading: loadingConfig } = useConfig()
 
   useEffect(() => {
-    fetchProducts()
+    // CAMBIO: Solo cargar clientes, los productos se buscan en tiempo real
     fetchClients()
   }, [])
 
@@ -286,10 +287,6 @@ const Ventas = () => {
 
   const canProcessPayment = () => {
     return !!clienteSeleccionado && cartProducts.length > 0
-  }
-
-  const handlePageChange = (newPage) => {
-    updateFilters({ offset: (newPage - 1) * 10 })
   }
 
   if (loadingConfig) {
@@ -642,15 +639,12 @@ const Ventas = () => {
           selectedClient={clienteSeleccionado}
         />
 
+        {/* CAMBIO: El modal ya no recibe products como prop */}
         <ProductSelectionModal
           isOpen={showProductModal}
           onClose={() => setShowProductModal(false)}
           onProductSelect={addProductToCart}
-          products={products}
           loading={loadingProducts}
-          onSearchChange={(newSearchTerm) => updateFilters({ search: newSearchTerm, offset: 0 })}
-          onPageChange={(newPage) => handlePageChange(newPage)}
-          pagination={pagination}
         />
 
         <PaymentModal

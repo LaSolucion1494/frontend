@@ -71,6 +71,46 @@ export const useProducts = (initialFilters = {}) => {
     [filters],
   )
 
+  // NUEVA FUNCIÓN: Búsqueda específica para modales (similar a searchClients)
+  const searchProducts = useCallback(async (term) => {
+    if (!term || term.length < 2) {
+      return { success: true, data: [] }
+    }
+
+    try {
+      console.log("useProducts.searchProducts - Buscando:", term)
+      const result = await productsService.search(term)
+
+      console.log("useProducts.searchProducts - Resultado:", result)
+
+      if (result.success) {
+        const formattedResults = result.data.map((product) => ({
+          ...product,
+          stock: product.stock || 0,
+          precio_venta: product.precio_venta || 0,
+        }))
+        return { success: true, data: formattedResults }
+      } else {
+        console.error("useProducts.searchProducts - Error:", result.message)
+        return { success: false, message: result.message, data: [] }
+      }
+    } catch (error) {
+      console.error("useProducts.searchProducts - Excepción:", error)
+
+      let errorMessage = "Error al buscar productos"
+
+      if (error.message?.includes("Network Error") || error.code === "ERR_NETWORK") {
+        errorMessage = "Error de conexión. Verifique su conexión a internet."
+      } else if (error.response?.status === 404) {
+        errorMessage = "Servicio de búsqueda no disponible."
+      } else if (error.response?.status >= 500) {
+        errorMessage = "Error del servidor. Intente nuevamente."
+      }
+
+      return { success: false, message: errorMessage, data: [] }
+    }
+  }, [])
+
   const updateFilters = useCallback((newFilters) => {
     setFilters((prev) => ({ ...prev, ...newFilters }))
   }, [])
@@ -172,8 +212,8 @@ export const useProducts = (initialFilters = {}) => {
     }
   }
 
-  // Nueva función para búsqueda de productos
-  const searchProducts = async (searchFilters = {}) => {
+  // Función de búsqueda avanzada (mantener compatibilidad)
+  const searchProductsAdvanced = async (searchFilters = {}) => {
     try {
       const result = await productsService.searchProducts(searchFilters)
       if (result.success) {
@@ -211,7 +251,8 @@ export const useProducts = (initialFilters = {}) => {
     updateProduct,
     deleteProduct,
     getProductByCode,
-    searchProducts, // Nueva función
+    searchProducts, // NUEVA función para modales
+    searchProductsAdvanced, // Función avanzada (renombrada para claridad)
     updateSorting, // Mantener compatibilidad
     resetSorting, // Mantener compatibilidad
     updateFilters,

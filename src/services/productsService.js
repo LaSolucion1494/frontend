@@ -55,6 +55,21 @@ export const productsService = {
     }
   },
 
+  // NUEVA FUNCIÓN: Búsqueda específica para modales (sin paginación)
+  search: async (term) => {
+    try {
+      const response = await apiClient.get(`/products/search?search=${encodeURIComponent(term)}&limit=50`)
+      return { success: true, data: response.data.data || response.data }
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || "Error al buscar productos",
+        error: error.response?.data,
+        data: [],
+      }
+    }
+  },
+
   // Obtener un producto por ID
   getProductById: async (id) => {
     try {
@@ -202,7 +217,7 @@ export const productsService = {
     }
   },
 
-  // Búsqueda de productos para dashboard
+  // Búsqueda de productos para dashboard (mantener compatibilidad)
   searchProducts: async (filters = {}) => {
     try {
       console.log("productsService.searchProducts called with filters:", filters)

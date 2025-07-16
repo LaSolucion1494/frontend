@@ -6,82 +6,48 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Search, Package, Plus, Barcode, Tag, X, AlertTriangle } from "lucide-react"
 import { useDebounce } from "../../hooks/useDebounce"
+import { useProducts } from "../../hooks/useProducts"
 import SalesQuantityModal from "./SalesQuantityModal"
 
-const ProductSelectionModal = ({
-  isOpen,
-  onClose,
-  onProductSelect,
-  products = [],
-  loading = false,
-  onSearchChange,
-  onPageChange,
-  pagination,
-}) => {
+const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: externalLoading = false }) => {
   const [searchTerm, setSearchTerm] = useState("")
-  // ELIMINAR: const [filteredProducts, setFilteredProducts] = useState([])
+  const [searchResults, setSearchResults] = useState([])
+  const [isSearching, setIsSearching] = useState(false)
   const [showQuantityModal, setShowQuantityModal] = useState(false)
   const [selectedProductForQuantity, setSelectedProductForQuantity] = useState(null)
 
-  const debouncedSearchTerm = useDebounce(searchTerm, 300)
+  // Usar el hook de productos para la búsqueda
+  const { searchProducts } = useProducts()
 
-  // ELIMINAR: useEffect para filtrado local
-  /*
+  const debouncedSearchTerm = useDebounce(searchTerm, 500)
+
+  // Realizar búsqueda en el backend cuando cambia el término
   useEffect(() => {
-    let filtered = products.filter((product) => product.activo !== false)
-
-    // Filtrar por término de búsqueda
-    if (debouncedSearchTerm) {
-      const normalizedSearch = debouncedSearchTerm
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-
-      filtered = filtered.filter((product) => {
-        const normalizedName = product.nombre
-          .toLowerCase()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-        const normalizedCode = product.codigo ? product.codigo.toLowerCase() : ""
-        const normalizedBrand = product.marca
-          ? product.marca
-              .toLowerCase()
-              .normalize("NFD")
-              .replace(/[\u0300-\u036f]/g, "")
-          : ""
-
-        return (
-          normalizedName.includes(normalizedSearch) ||
-          normalizedCode.includes(normalizedSearch) ||
-          normalizedBrand.includes(normalizedSearch)
-        )
-      })
-    }
-
-    // Ordenar por relevancia
-    filtered.sort((a, b) => {
-      if (debouncedSearchTerm) {
-        const searchLower = debouncedSearchTerm.toLowerCase()
-        const aNameMatch = a.nombre.toLowerCase().includes(searchLower)
-        const bNameMatch = b.nombre.toLowerCase().includes(searchLower)
-
-        if (aNameMatch && !bNameMatch) return -1
-        if (!aNameMatch && bNameMatch) return 1
+    const performSearch = async () => {
+      if (!debouncedSearchTerm || debouncedSearchTerm.length < 2) {
+        setSearchResults([])
+        setIsSearching(false)
+        return
       }
 
-      return a.nombre.localeCompare(b.nombre)
-    })
-
-    setFilteredProducts(filtered.slice(0, 50))
-  }, [debouncedSearchTerm, products])
-  */
-
-  // NUEVO: Disparar la búsqueda en el backend cuando el término de búsqueda debounced cambia
-  useEffect(() => {
-    if (onSearchChange) {
-      onSearchChange(debouncedSearchTerm)
+      setIsSearching(true)
+      try {
+        const result = await searchProducts(debouncedSearchTerm)
+        if (result.success) {
+          setSearchResults(result.data || [])
+        } else {
+          setSearchResults([])
+        }
+      } catch (error) {
+        console.error("Error en búsqueda de productos:", error)
+        setSearchResults([])
+      } finally {
+        setIsSearching(false)
+      }
     }
-  }, [debouncedSearchTerm, onSearchChange])
+
+    performSearch()
+  }, [debouncedSearchTerm, searchProducts])
 
   // Manejar selección de producto
   const handleSelectProduct = (product) => {
@@ -102,7 +68,7 @@ const ProductSelectionModal = ({
     onProductSelect(product, quantity)
     setShowQuantityModal(false)
     setSelectedProductForQuantity(null)
-    onClose()
+    handleClose()
   }
 
   const handleQuantityModalClose = () => {
@@ -113,7 +79,8 @@ const ProductSelectionModal = ({
   // Limpiar estado al cerrar
   const handleClose = () => {
     setSearchTerm("")
-    // ELIMINAR: setFilteredProducts([])
+    setSearchResults([])
+    setIsSearching(false)
     onClose()
   }
 
@@ -168,7 +135,7 @@ const ProductSelectionModal = ({
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Seleccionar Productos</h2>
-              <p className="text-sm text-slate-300 mt-1">Agregue productos al carrito de ventas</p>
+              <p className="text-sm text-slate-300 mt-1">Busque y agregue productos al carrito de ventas</p>
             </div>
           </div>
           <Button
@@ -176,7 +143,7 @@ const ProductSelectionModal = ({
             variant="ghost"
             size="sm"
             className="text-slate-300 hover:text-white hover:bg-slate-700"
-            disabled={loading}
+            disabled={isSearching || externalLoading}
           >
             <X className="w-5 h-5" />
           </Button>
@@ -192,31 +159,41 @@ const ProductSelectionModal = ({
                 type="text"
                 placeholder="Buscar por nombre, código o marca..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)} // Esto ahora dispara el useEffect que llama a onSearchChange
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 border-slate-300 bg-slate-50 focus:border-slate-800 focus:ring-slate-800/20"
-                disabled={loading}
+                disabled={isSearching || externalLoading}
                 autoFocus
               />
+              {isSearching && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-800"></div>
+                </div>
+              )}
             </div>
+
+            {/* Información de búsqueda */}
+            {searchTerm && searchTerm.length < 2 && (
+              <div className="text-center text-slate-500 text-sm">Escriba al menos 2 caracteres para buscar</div>
+            )}
 
             {/* Resultados de búsqueda */}
             <div className="border border-slate-200 bg-white rounded-lg shadow-sm">
-              {loading ? (
+              {isSearching ? (
                 <div className="p-12 text-center text-slate-500">
                   <div className="inline-block h-8 w-8 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin mb-4"></div>
                   <p className="font-medium">Buscando productos...</p>
+                  <p className="text-sm text-slate-400 mt-1">Buscando en toda la base de datos</p>
                 </div>
-              ) : products.length > 0 ? ( // CAMBIO: Usar `products` directamente
+              ) : searchTerm && searchTerm.length >= 2 && searchResults.length > 0 ? (
                 <div className="divide-y divide-slate-100">
-                  {products.map((product) => {
-                    // CAMBIO: Usar `products` directamente
+                  {searchResults.map((product) => {
                     const stockStatus = getStockStatus(product)
                     const precioVenta = product.precio_venta || 0
                     const StatusIcon = stockStatus.icon
                     const stockMinimo = product.stock_minimo || 5
 
                     return (
-                      <div key={product.id} className="p-5 hover:bg-slate-50 transition-colors">
+                      <div key={product.id} className="p-5 hover:bg-slate-50 transition-colors group">
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between mb-3">
@@ -249,9 +226,9 @@ const ProductSelectionModal = ({
                               </div>
                               <Button
                                 onClick={() => handleSelectProduct(product)}
-                                className="ml-4 bg-slate-800 hover:bg-slate-700 text-white"
+                                className="ml-4 bg-slate-800 hover:bg-slate-700 text-white opacity-0 group-hover:opacity-100 transition-opacity"
                                 size="sm"
-                                disabled={loading}
+                                disabled={isSearching || externalLoading}
                               >
                                 <Plus className="h-3 w-3 mr-1" />
                                 Agregar
@@ -295,36 +272,18 @@ const ProductSelectionModal = ({
                     )
                   })}
 
-                  {/* NUEVO: Controles de paginación */}
-                  {pagination && pagination.totalPages > 1 && (
-                    <div className="p-4 flex justify-between items-center border-t border-slate-100 bg-slate-50">
-                      <Button
-                        onClick={() => onPageChange(pagination.currentPage - 1)}
-                        disabled={pagination.currentPage === 1 || loading}
-                        variant="outline"
-                        size="sm"
-                      >
-                        Anterior
-                      </Button>
-                      <span className="text-sm text-slate-600">
-                        Página {pagination.currentPage} de {pagination.totalPages}
-                      </span>
-                      <Button
-                        onClick={() => onPageChange(pagination.currentPage + 1)}
-                        disabled={pagination.currentPage === pagination.totalPages || loading}
-                        variant="outline"
-                        size="sm"
-                      >
-                        Siguiente
-                      </Button>
+                  {searchResults.length === 50 && (
+                    <div className="p-4 text-center text-xs text-slate-500 bg-slate-50 border-t border-slate-100">
+                      Mostrando los primeros 50 resultados. Refine su búsqueda para ver más productos específicos.
                     </div>
                   )}
                 </div>
-              ) : searchTerm && products.length === 0 ? ( // CAMBIO: Usar `products` directamente
+              ) : searchTerm && searchTerm.length >= 2 && searchResults.length === 0 && !isSearching ? (
                 <div className="p-12 text-center text-slate-500">
                   <Package className="w-16 h-16 mx-auto mb-4 text-slate-300" />
                   <h3 className="font-medium text-lg mb-2">No se encontraron productos</h3>
-                  <p className="text-sm text-slate-400">
+                  <p className="text-sm text-slate-400 mb-2">No hay productos que coincidan con "{searchTerm}"</p>
+                  <p className="text-xs text-slate-400">
                     Intente con otros términos de búsqueda o verifique la ortografía
                   </p>
                 </div>
@@ -334,6 +293,9 @@ const ProductSelectionModal = ({
                   <h3 className="font-medium text-lg mb-2">Busque productos para agregar</h3>
                   <p className="text-sm text-slate-400 mb-4">
                     Use el campo de búsqueda para encontrar productos por nombre, código o marca
+                  </p>
+                  <p className="text-xs text-slate-400 mb-2">
+                    La búsqueda se realiza en toda la base de datos, no solo en la página actual
                   </p>
                   <p className="text-xs text-slate-400">
                     Los productos sin stock aparecerán marcados y requerirán confirmación
@@ -350,7 +312,7 @@ const ProductSelectionModal = ({
           onClose={handleQuantityModalClose}
           onConfirm={handleQuantityConfirm}
           product={selectedProductForQuantity}
-          loading={loading}
+          loading={isSearching || externalLoading}
         />
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { API_URL } from "../config"
 
 class PricingService {
-  // Obtener configuración de precios
+  // Obtener configuración de precios desde el endpoint de configuración general
   async getPricingConfig() {
     try {
       const response = await fetch(`${API_URL}/config`, {
@@ -17,13 +17,18 @@ class PricingService {
       }
 
       const config = await response.json()
-      return {
-        rentabilidad: config.rentabilidad || 40,
-        iva: config.iva || 21,
-        ingresos_brutos: config.ingresos_brutos || 0,
-        otros_impuestos: config.otros_impuestos || 0,
-        stock_minimo: config.stock_minimo || 5,
+
+      // Mapear y validar la configuración
+      const pricingConfig = {
+        rentabilidad: this.parseNumber(config.rentabilidad, 40),
+        iva: this.parseNumber(config.iva, 21),
+        ingresos_brutos: this.parseNumber(config.ingresos_brutos, 0),
+        otros_impuestos: this.parseNumber(config.otros_impuestos, 0),
+        stock_minimo: this.parseNumber(config.stock_minimo_default, 5),
       }
+
+      console.log("Configuración de precios obtenida:", pricingConfig)
+      return pricingConfig
     } catch (error) {
       console.error("Error obteniendo configuración:", error)
       // Devolver configuración por defecto
@@ -37,15 +42,32 @@ class PricingService {
     }
   }
 
+  // Función auxiliar para parsear números de forma segura
+  parseNumber(value, defaultValue) {
+    if (value === null || value === undefined || value === "") {
+      return defaultValue
+    }
+
+    const parsed = Number(value)
+    if (isNaN(parsed) || !isFinite(parsed) || parsed < 0) {
+      console.warn(`Valor inválido para configuración: ${value}, usando valor por defecto: ${defaultValue}`)
+      return defaultValue
+    }
+
+    return parsed
+  }
+
   // Calcular precio de venta
   calculateSalePrice(costPrice, config) {
     if (!costPrice || costPrice <= 0) return 0
 
     try {
-      const rentabilidad = config.rentabilidad || 40
-      const iva = config.iva || 21
-      const ingresosBrutos = config.ingresos_brutos || 0
-      const otrosImpuestos = config.otros_impuestos || 0
+      const rentabilidad = this.parseNumber(config?.rentabilidad, 40)
+      const iva = this.parseNumber(config?.iva, 21)
+      const ingresosBrutos = this.parseNumber(config?.ingresos_brutos, 0)
+      const otrosImpuestos = this.parseNumber(config?.otros_impuestos, 0)
+
+      console.log("Calculando precio con configuración:", { rentabilidad, iva, ingresosBrutos, otrosImpuestos })
 
       // Calcular rentabilidad sobre el costo
       const rentabilidadMonto = costPrice * (rentabilidad / 100)
@@ -63,7 +85,10 @@ class PricingService {
       // Precio final
       const precioFinal = precioNeto + ivaMonto
 
-      return Math.round(precioFinal * 100) / 100
+      const resultado = Math.round(precioFinal * 100) / 100
+      console.log("Precio calculado:", { costPrice, precioFinal: resultado })
+
+      return resultado
     } catch (error) {
       console.error("Error calculando precio:", error)
       return 0
@@ -84,10 +109,10 @@ class PricingService {
       }
     }
 
-    const rentabilidad = config.rentabilidad || 40
-    const iva = config.iva || 21
-    const ingresosBrutos = config.ingresos_brutos || 0
-    const otrosImpuestos = config.otros_impuestos || 0
+    const rentabilidad = this.parseNumber(config?.rentabilidad, 40)
+    const iva = this.parseNumber(config?.iva, 21)
+    const ingresosBrutos = this.parseNumber(config?.ingresos_brutos, 0)
+    const otrosImpuestos = this.parseNumber(config?.otros_impuestos, 0)
 
     const rentabilidadMonto = costPrice * (rentabilidad / 100)
     const ingresosBrutosMonto = costPrice * (ingresosBrutos / 100)
@@ -110,7 +135,7 @@ class PricingService {
   // Actualizar precio de producto
   async updateProductPrice(productId, newCostPrice, newSalePrice) {
     try {
-      const response = await fetch(`${API_URL}/products/${productId}/price`, {
+      const response = await fetch(`${API_URL}/products/${productId}/prices`, {
         method: "PUT",
         credentials: "include",
         headers: {

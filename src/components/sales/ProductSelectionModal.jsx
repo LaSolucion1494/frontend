@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -30,111 +30,111 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
   // Hook de productos
   const { searchProducts } = useProducts()
 
-  // Función para búsqueda por código
-  const handleCodeSearch = async (searchTerm) => {
-    if (!searchTerm.trim()) {
-      setCodeSearchResults([])
-      return
-    }
-
-    setCodeSearchLoading(true)
-    try {
-      console.log("Buscando por código en ventas:", searchTerm)
-
-      const searchResult = await searchProducts(searchTerm.trim(), {
-        limit: 20,
-      })
-
-      if (searchResult.success) {
-        // Filtrar y priorizar coincidencias de código
-        const codeMatches = searchResult.data
-          .filter((product) => product.codigo.toLowerCase().includes(searchTerm.toLowerCase()))
-          .sort((a, b) => {
-            // Priorizar coincidencias exactas
-            const aExact = a.codigo.toLowerCase() === searchTerm.toLowerCase()
-            const bExact = b.codigo.toLowerCase() === searchTerm.toLowerCase()
-            if (aExact && !bExact) return -1
-            if (!aExact && bExact) return 1
-
-            // Luego priorizar coincidencias que empiecen con el término
-            const aStarts = a.codigo.toLowerCase().startsWith(searchTerm.toLowerCase())
-            const bStarts = b.codigo.toLowerCase().startsWith(searchTerm.toLowerCase())
-            if (aStarts && !bStarts) return -1
-            if (!aStarts && bStarts) return 1
-
-            return 0
-          })
-
-        setCodeSearchResults(codeMatches)
-      } else {
+  // Función para búsqueda por código - OPTIMIZADA
+  const handleCodeSearch = useCallback(
+    async (searchTerm) => {
+      if (!searchTerm.trim()) {
         setCodeSearchResults([])
+        return
       }
-    } catch (error) {
-      console.error("Error en búsqueda por código:", error)
-      setCodeSearchResults([])
-    } finally {
-      setCodeSearchLoading(false)
-    }
-  }
 
-  // Función para búsqueda por nombre/descripción
-  const handleNameSearch = async (searchTerm) => {
-    if (!searchTerm.trim()) {
-      setNameSearchResults([])
-      return
-    }
+      setCodeSearchLoading(true)
+      try {
+        console.log("Buscando por código en ventas:", searchTerm)
 
-    setNameSearchLoading(true)
-    try {
-      console.log("Buscando por nombre en ventas:", searchTerm)
+        const searchResult = await searchProducts(searchTerm.trim(), {
+          limit: 20,
+        })
 
-      const searchResult = await searchProducts(searchTerm.trim(), {
-        limit: 30,
-      })
+        if (searchResult.success) {
+          const codeMatches = searchResult.data
+            .filter((product) => product.codigo.toLowerCase().includes(searchTerm.toLowerCase()))
+            .sort((a, b) => {
+              const aExact = a.codigo.toLowerCase() === searchTerm.toLowerCase()
+              const bExact = b.codigo.toLowerCase() === searchTerm.toLowerCase()
+              if (aExact && !bExact) return -1
+              if (!aExact && bExact) return 1
 
-      if (searchResult.success) {
-        // Filtrar productos que coincidan en nombre, descripción o marca
-        const nameMatches = searchResult.data
-          .filter((product) => {
-            const term = searchTerm.toLowerCase()
-            const matchesName = product.nombre.toLowerCase().includes(term)
-            const matchesDescription = product.descripcion && product.descripcion.toLowerCase().includes(term)
-            const matchesBrand = product.marca && product.marca.toLowerCase().includes(term)
-            const matchesCode = product.codigo.toLowerCase().includes(term)
+              const aStarts = a.codigo.toLowerCase().startsWith(searchTerm.toLowerCase())
+              const bStarts = b.codigo.toLowerCase().startsWith(searchTerm.toLowerCase())
+              if (aStarts && !bStarts) return -1
+              if (!aStarts && bStarts) return 1
 
-            return matchesName || matchesDescription || matchesBrand || matchesCode
-          })
-          .sort((a, b) => {
-            const term = searchTerm.toLowerCase()
+              return 0
+            })
 
-            // Priorizar coincidencias exactas en nombre
-            const aNameExact = a.nombre.toLowerCase() === term
-            const bNameExact = b.nombre.toLowerCase() === term
-            if (aNameExact && !bNameExact) return -1
-            if (!aNameExact && bNameExact) return 1
+          setCodeSearchResults(codeMatches)
+        } else {
+          setCodeSearchResults([])
+        }
+      } catch (error) {
+        console.error("Error en búsqueda por código:", error)
+        setCodeSearchResults([])
+      } finally {
+        setCodeSearchLoading(false)
+      }
+    },
+    [searchProducts],
+  )
 
-            // Luego priorizar nombres que empiecen con el término
-            const aNameStarts = a.nombre.toLowerCase().startsWith(term)
-            const bNameStarts = b.nombre.toLowerCase().startsWith(term)
-            if (aNameStarts && !bNameStarts) return -1
-            if (!aNameStarts && bNameStarts) return 1
-
-            return a.nombre.localeCompare(b.nombre)
-          })
-
-        setNameSearchResults(nameMatches)
-      } else {
+  // Función para búsqueda por nombre - OPTIMIZADA
+  const handleNameSearch = useCallback(
+    async (searchTerm) => {
+      if (!searchTerm.trim()) {
         setNameSearchResults([])
+        return
       }
-    } catch (error) {
-      console.error("Error en búsqueda por nombre:", error)
-      setNameSearchResults([])
-    } finally {
-      setNameSearchLoading(false)
-    }
-  }
 
-  // Debounce para búsquedas
+      setNameSearchLoading(true)
+      try {
+        console.log("Buscando por nombre en ventas:", searchTerm)
+
+        const searchResult = await searchProducts(searchTerm.trim(), {
+          limit: 30,
+        })
+
+        if (searchResult.success) {
+          const nameMatches = searchResult.data
+            .filter((product) => {
+              const term = searchTerm.toLowerCase()
+              const matchesName = product.nombre.toLowerCase().includes(term)
+              const matchesDescription = product.descripcion && product.descripcion.toLowerCase().includes(term)
+              const matchesBrand = product.marca && product.marca.toLowerCase().includes(term)
+              const matchesCode = product.codigo.toLowerCase().includes(term)
+
+              return matchesName || matchesDescription || matchesBrand || matchesCode
+            })
+            .sort((a, b) => {
+              const term = searchTerm.toLowerCase()
+
+              const aNameExact = a.nombre.toLowerCase() === term
+              const bNameExact = b.nombre.toLowerCase() === term
+              if (aNameExact && !bNameExact) return -1
+              if (!aNameExact && bNameExact) return 1
+
+              const aNameStarts = a.nombre.toLowerCase().startsWith(term)
+              const bNameStarts = b.nombre.toLowerCase().startsWith(term)
+              if (aNameStarts && !bNameStarts) return -1
+              if (!aNameStarts && bNameStarts) return 1
+
+              return a.nombre.localeCompare(b.nombre)
+            })
+
+          setNameSearchResults(nameMatches)
+        } else {
+          setNameSearchResults([])
+        }
+      } catch (error) {
+        console.error("Error en búsqueda por nombre:", error)
+        setNameSearchResults([])
+      } finally {
+        setNameSearchLoading(false)
+      }
+    },
+    [searchProducts],
+  )
+
+  // Debounce optimizado - CORREGIDO
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (codeSearchTerm.trim()) {
@@ -145,7 +145,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
     }, 200)
 
     return () => clearTimeout(timeoutId)
-  }, [codeSearchTerm])
+  }, [codeSearchTerm, handleCodeSearch])
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -157,7 +157,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
     }, 300)
 
     return () => clearTimeout(timeoutId)
-  }, [nameSearchTerm])
+  }, [nameSearchTerm, handleNameSearch])
 
   // Función para resaltar términos de búsqueda
   const highlightSearchTerm = (text, searchTerm) => {

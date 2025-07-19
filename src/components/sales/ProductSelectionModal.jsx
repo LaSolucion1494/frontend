@@ -30,14 +30,18 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
   // Hook de productos
   const { searchProducts } = useProducts()
 
-  // Función para búsqueda por código - IGUAL QUE EN DASHBOARD
+  // Referencias para los timeouts del debounce
+  const codeSearchTimeoutRef = useRef(null)
+  const nameSearchTimeoutRef = useRef(null)
+
+  // Función para búsqueda por código - MEJORADA PARA MANTENER FOCO
   const handleCodeSearch = async (searchTerm) => {
     if (!searchTerm.trim()) {
       setCodeSearchResults([])
       return
     }
 
-    setCodeSearchLoading(true)
+    // No cambiar el estado de loading inmediatamente para evitar re-renders
     try {
       console.log("Buscando por código en modal:", searchTerm)
 
@@ -76,19 +80,16 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
     } catch (error) {
       console.error("Error en búsqueda por código en modal:", error)
       setCodeSearchResults([])
-    } finally {
-      setCodeSearchLoading(false)
     }
   }
 
-  // Función para búsqueda por nombre - IGUAL QUE EN DASHBOARD
+  // Función para búsqueda por nombre - MEJORADA PARA MANTENER FOCO
   const handleNameSearch = async (searchTerm) => {
     if (!searchTerm.trim()) {
       setNameSearchResults([])
       return
     }
 
-    setNameSearchLoading(true)
     try {
       console.log("Buscando por nombre en modal:", searchTerm)
 
@@ -138,35 +139,75 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
     } catch (error) {
       console.error("Error en búsqueda por nombre en modal:", error)
       setNameSearchResults([])
-    } finally {
-      setNameSearchLoading(false)
     }
   }
 
-  // Debounce IGUAL QUE EN DASHBOARD - SIN DEPENDENCIAS DE FUNCIONES
+  // DEBOUNCE MEJORADO - SIN CAMBIOS DE LOADING STATE QUE CAUSEN RE-RENDERS
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (codeSearchTerm.trim()) {
-        handleCodeSearch(codeSearchTerm)
-      } else {
-        setCodeSearchResults([])
-      }
-    }, 200)
+    // Limpiar timeout anterior
+    if (codeSearchTimeoutRef.current) {
+      clearTimeout(codeSearchTimeoutRef.current)
+    }
 
-    return () => clearTimeout(timeoutId)
-  }, [codeSearchTerm]) // SOLO codeSearchTerm como dependencia
+    if (codeSearchTerm.trim()) {
+      // Mostrar loading solo al inicio de la búsqueda
+      setCodeSearchLoading(true)
+
+      codeSearchTimeoutRef.current = setTimeout(async () => {
+        await handleCodeSearch(codeSearchTerm)
+        setCodeSearchLoading(false)
+      }, 200)
+    } else {
+      setCodeSearchResults([])
+      setCodeSearchLoading(false)
+    }
+
+    // Cleanup
+    return () => {
+      if (codeSearchTimeoutRef.current) {
+        clearTimeout(codeSearchTimeoutRef.current)
+      }
+    }
+  }, [codeSearchTerm])
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (nameSearchTerm.trim()) {
-        handleNameSearch(nameSearchTerm)
-      } else {
-        setNameSearchResults([])
-      }
-    }, 300)
+    // Limpiar timeout anterior
+    if (nameSearchTimeoutRef.current) {
+      clearTimeout(nameSearchTimeoutRef.current)
+    }
 
-    return () => clearTimeout(timeoutId)
-  }, [nameSearchTerm]) // SOLO nameSearchTerm como dependencia
+    if (nameSearchTerm.trim()) {
+      // Mostrar loading solo al inicio de la búsqueda
+      setNameSearchLoading(true)
+
+      nameSearchTimeoutRef.current = setTimeout(async () => {
+        await handleNameSearch(nameSearchTerm)
+        setNameSearchLoading(false)
+      }, 300)
+    } else {
+      setNameSearchResults([])
+      setNameSearchLoading(false)
+    }
+
+    // Cleanup
+    return () => {
+      if (nameSearchTimeoutRef.current) {
+        clearTimeout(nameSearchTimeoutRef.current)
+      }
+    }
+  }, [nameSearchTerm])
+
+  // Limpiar timeouts al desmontar el componente
+  useEffect(() => {
+    return () => {
+      if (codeSearchTimeoutRef.current) {
+        clearTimeout(codeSearchTimeoutRef.current)
+      }
+      if (nameSearchTimeoutRef.current) {
+        clearTimeout(nameSearchTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Función para resaltar términos de búsqueda
   const highlightSearchTerm = (text, searchTerm) => {
@@ -213,6 +254,8 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
     setNameSearchTerm("")
     setCodeSearchResults([])
     setNameSearchResults([])
+    setCodeSearchLoading(false)
+    setNameSearchLoading(false)
   }
 
   // Limpiar estado al cerrar
@@ -343,7 +386,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
               }}
               className="bg-slate-800 hover:bg-slate-700 text-white opacity-0 group-hover:opacity-100 transition-opacity"
               size="sm"
-              disabled={codeSearchLoading || nameSearchLoading || externalLoading}
+              disabled={externalLoading}
             >
               <Plus className="h-3 w-3 mr-1" />
               Agregar
@@ -375,7 +418,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
             variant="ghost"
             size="sm"
             className="text-slate-300 hover:text-white hover:bg-slate-700"
-            disabled={codeSearchLoading || nameSearchLoading || externalLoading}
+            disabled={externalLoading}
           >
             <X className="w-5 h-5" />
           </Button>
@@ -401,7 +444,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
                     onChange={(e) => setCodeSearchTerm(e.target.value)}
                     className="pl-10 border-slate-300 focus:border-slate-800 focus:ring-2 focus:ring-slate-200"
                     autoComplete="off"
-                    disabled={codeSearchLoading || nameSearchLoading || externalLoading}
+                    disabled={externalLoading}
                   />
                   {codeSearchLoading && (
                     <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
@@ -457,7 +500,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
                     onChange={(e) => setNameSearchTerm(e.target.value)}
                     className="pl-10 border-slate-300 focus:border-slate-800 focus:ring-2 focus:ring-slate-200"
                     autoComplete="off"
-                    disabled={codeSearchLoading || nameSearchLoading || externalLoading}
+                    disabled={externalLoading}
                   />
                   {nameSearchLoading && (
                     <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
@@ -510,7 +553,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
                   variant="outline"
                   size="sm"
                   className="text-slate-600 bg-transparent hover:bg-slate-50"
-                  disabled={codeSearchLoading || nameSearchLoading || externalLoading}
+                  disabled={externalLoading}
                 >
                   <X className="w-4 h-4 mr-2" />
                   Limpiar búsquedas
@@ -548,7 +591,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
           onClose={handleQuantityModalClose}
           onConfirm={handleQuantityConfirm}
           product={selectedProductForQuantity}
-          loading={codeSearchLoading || nameSearchLoading || externalLoading}
+          loading={externalLoading}
         />
       </div>
     </div>

@@ -62,38 +62,14 @@ const Dashboard = () => {
   // Hooks personalizados
   const { stats, recentSales, lowStockProducts, loading: dashboardLoading, fetchDashboardData } = useDashboard()
 
-  const { getProductByCode, searchProducts } = useProducts()
+  const { searchProducts } = useProducts()
 
   // Cargar datos del dashboard al montar
   useEffect(() => {
     fetchDashboardData()
   }, [fetchDashboardData])
 
-  // Función para limpiar búsquedas
-  const clearSearches = () => {
-    setCodeSearchTerm("")
-    setNameSearchTerm("")
-    setCodeSearchResults([])
-    setNameSearchResults([])
-  }
-
-  // Función para obtener el color del estado de stock
-  const getStockStatusColor = (product) => {
-    const stockMinimo = product.stock_minimo || 5
-    if (product.stock === 0) return "text-red-600 bg-red-50 border-red-200"
-    if (product.stock <= stockMinimo) return "text-orange-600 bg-orange-50 border-orange-200"
-    return "text-green-600 bg-green-50 border-green-200"
-  }
-
-  // Función para obtener el texto del estado de stock
-  const getStockStatusText = (product) => {
-    const stockMinimo = product.stock_minimo || 5
-    if (product.stock === 0) return "Sin stock"
-    if (product.stock <= stockMinimo) return "Stock bajo"
-    return "Disponible"
-  }
-
-  // Función mejorada para búsqueda por código (más flexible)
+  // Función para búsqueda rápida por código
   const handleCodeSearch = async (searchTerm) => {
     if (!searchTerm.trim()) {
       setCodeSearchResults([])
@@ -102,27 +78,32 @@ const Dashboard = () => {
 
     setCodeSearchLoading(true)
     try {
-      // Primero intentar búsqueda exacta por código
-      if (searchTerm.length >= 3) {
-        const exactResult = await getProductByCode(searchTerm.trim())
-        if (exactResult.success) {
-          setCodeSearchResults([exactResult.data])
-          setCodeSearchLoading(false)
-          return
-        }
-      }
-
-      // Si no encuentra exacto, buscar códigos que contengan el término
+      // Buscar códigos que contengan el término (búsqueda progresiva)
       const searchResult = await searchProducts({
         search: searchTerm.trim(),
-        limit: 10,
+        limit: 15,
       })
 
       if (searchResult.success) {
-        // Filtrar solo productos cuyo código contenga el término de búsqueda
-        const codeMatches = searchResult.data.filter((product) =>
-          product.codigo.toLowerCase().includes(searchTerm.toLowerCase()),
-        )
+        // Filtrar y priorizar coincidencias de código
+        const codeMatches = searchResult.data
+          .filter((product) => product.codigo.toLowerCase().includes(searchTerm.toLowerCase()))
+          .sort((a, b) => {
+            // Priorizar coincidencias exactas
+            const aExact = a.codigo.toLowerCase() === searchTerm.toLowerCase()
+            const bExact = b.codigo.toLowerCase() === searchTerm.toLowerCase()
+            if (aExact && !bExact) return -1
+            if (!aExact && bExact) return 1
+
+            // Luego priorizar coincidencias que empiecen con el término
+            const aStarts = a.codigo.toLowerCase().startsWith(searchTerm.toLowerCase())
+            const bStarts = b.codigo.toLowerCase().startsWith(searchTerm.toLowerCase())
+            if (aStarts && !bStarts) return -1
+            if (!aStarts && bStarts) return 1
+
+            return 0
+          })
+
         setCodeSearchResults(codeMatches)
       } else {
         setCodeSearchResults([])
@@ -135,9 +116,9 @@ const Dashboard = () => {
     }
   }
 
-  // Función mejorada para búsqueda por nombre (más progresiva)
+  // Función para búsqueda rápida por nombre/descripción
   const handleNameSearch = async (searchTerm) => {
-    if (!searchTerm.trim() || searchTerm.trim().length < 1) {
+    if (!searchTerm.trim()) {
       setNameSearchResults([])
       return
     }
@@ -146,18 +127,41 @@ const Dashboard = () => {
     try {
       const searchResult = await searchProducts({
         search: searchTerm.trim(),
-        limit: 15,
+        limit: 20,
       })
 
       if (searchResult.success) {
-        // Filtrar productos que NO sean coincidencias exactas de código
-        const nameMatches = searchResult.data.filter(
-          (product) =>
-            !product.codigo.toLowerCase().includes(searchTerm.toLowerCase()) &&
-            (product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              (product.descripcion && product.descripcion.toLowerCase().includes(searchTerm.toLowerCase())) ||
-              (product.marca && product.marca.toLowerCase().includes(searchTerm.toLowerCase()))),
-        )
+        // Filtrar productos que coincidan en nombre, descripción o marca (excluyendo códigos)
+        const nameMatches = searchResult.data
+          .filter((product) => {
+            const term = searchTerm.toLowerCase()
+            const matchesName = product.nombre.toLowerCase().includes(term)
+            const matchesDescription = product.descripcion && product.descripcion.toLowerCase().includes(term)
+            const matchesBrand = product.marca && product.marca.toLowerCase().includes(term)
+            const matchesCode = product.codigo.toLowerCase().includes(term)
+
+            // Incluir si coincide en nombre, descripción o marca, pero no solo en código
+            return (matchesName || matchesDescription || matchesBrand) && !matchesCode
+          })
+          .sort((a, b) => {
+            const term = searchTerm.toLowerCase()
+
+            // Priorizar coincidencias exactas en nombre
+            const aNameExact = a.nombre.toLowerCase() === term
+            const bNameExact = b.nombre.toLowerCase() === term
+            if (aNameExact && !bNameExact) return -1
+            if (!aNameExact && bNameExact) return 1
+
+            // Luego priorizar nombres que empiecen con el término
+            const aNameStarts = a.nombre.toLowerCase().startsWith(term)
+            const bNameStarts = b.nombre.toLowerCase().startsWith(term)
+            if (aNameStarts && !bNameStarts) return -1
+            if (!aNameStarts && bNameStarts) return 1
+
+            // Finalmente ordenar alfabéticamente
+            return a.nombre.localeCompare(b.nombre)
+          })
+
         setNameSearchResults(nameMatches)
       } else {
         setNameSearchResults([])
@@ -170,42 +174,19 @@ const Dashboard = () => {
     }
   }
 
-  // Función para resaltar términos de búsqueda
-  const highlightSearchTerm = (text, searchTerm) => {
-    if (!searchTerm || !text) return text
-
-    const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi")
-    const parts = text.split(regex)
-
-    return (
-      <span>
-        {parts.map((part, index) =>
-          regex.test(part) ? (
-            <mark key={index} className="bg-yellow-200 px-1 rounded">
-              {part}
-            </mark>
-          ) : (
-            part
-          ),
-        )}
-      </span>
-    )
-  }
-
-  // Debounce mejorado para búsqueda por código (más rápido)
+  // Debounce más rápido y responsivo
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       handleCodeSearch(codeSearchTerm)
-    }, 150) // Reducido a 150ms para mayor rapidez
+    }, 100) // Muy rápido para códigos
 
     return () => clearTimeout(timeoutId)
   }, [codeSearchTerm])
 
-  // Debounce mejorado para búsqueda por nombre (más progresivo)
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       handleNameSearch(nameSearchTerm)
-    }, 200) // Reducido a 200ms para búsqueda progresiva
+    }, 150) // Rápido para nombres
 
     return () => clearTimeout(timeoutId)
   }, [nameSearchTerm])
@@ -238,6 +219,37 @@ const Dashboard = () => {
     if (e.key === "Enter" && nameSearchResults.length > 0) {
       openNameSearchModal()
     }
+  }
+
+  // Función para limpiar búsquedas
+  const clearSearches = () => {
+    setCodeSearchTerm("")
+    setNameSearchTerm("")
+    setCodeSearchResults([])
+    setNameSearchResults([])
+  }
+
+  // Función para obtener el color del estado de stock
+  const getStockStatusColor = (product) => {
+    const stockMinimo = product.stock_minimo || 5
+    if (product.stock === 0) return "text-red-600 bg-red-50 border-red-200"
+    if (product.stock <= stockMinimo) return "text-orange-600 bg-orange-50 border-orange-200"
+    return "text-green-600 bg-green-50 border-green-200"
+  }
+
+  // Función para obtener el texto del estado de stock
+  const getStockStatusText = (product) => {
+    const stockMinimo = product.stock_minimo || 5
+    if (product.stock === 0) return "Sin stock"
+    if (product.stock <= stockMinimo) return "Stock bajo"
+    return "Disponible"
+  }
+
+  // Función para resaltar el término de búsqueda en el nombre del producto
+  const highlightSearchTerm = (text, searchTerm) => {
+    if (!searchTerm) return text
+    const regex = new RegExp(`(${searchTerm})`, "gi")
+    return text.replace(regex, '<mark class="bg-yellow-200">$1</mark>')
   }
 
   if (dashboardLoading) {
@@ -276,7 +288,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Buscador Rápido de Productos - MEJORADO */}
+          {/* Buscador Rápido de Productos - VERSIÓN MEJORADA */}
           <Card className="mb-8 border-2 border-slate-800 shadow-lg">
             <CardHeader className="bg-slate-800 text-white">
               <CardTitle className="flex items-center gap-2 mb-3">
@@ -284,13 +296,13 @@ const Dashboard = () => {
                 Búsqueda Rápida de Productos
               </CardTitle>
               <CardDescription className="text-slate-200">
-                Busca productos por código o por nombre/descripción de forma instantánea
+                Busca productos de forma instantánea mientras escribes
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6">
               <div className="space-y-6">
-                {/* Inputs de búsqueda lado a lado */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Inputs de búsqueda lado a lado - MEJORADO */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Búsqueda por Código */}
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
@@ -301,11 +313,11 @@ const Dashboard = () => {
                       <ScanLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
                       <Input
                         ref={codeSearchInputRef}
-                        placeholder="Código del producto..."
+                        placeholder="Escribe o escanea el código..."
                         value={codeSearchTerm}
                         onChange={(e) => setCodeSearchTerm(e.target.value)}
                         onKeyDown={handleCodeSearchKeyDown}
-                        className="pl-12 pr-12 h-12 text-lg border-slate-300 focus:border-slate-800"
+                        className="pl-12 pr-12 h-12 text-lg border-slate-300 focus:border-slate-800 focus:ring-2 focus:ring-slate-200"
                         autoComplete="off"
                       />
                       {codeSearchLoading && (
@@ -314,6 +326,69 @@ const Dashboard = () => {
                         </div>
                       )}
                     </div>
+
+                    {/* Resultados de código en tiempo real */}
+                    {codeSearchResults.length > 0 && (
+                      <div className="border rounded-lg bg-white shadow-sm max-h-64 overflow-y-auto">
+                        <div className="p-2 bg-blue-50 border-b">
+                          <span className="text-xs font-medium text-blue-700 flex items-center gap-1">
+                            <Barcode className="w-3 h-3" />
+                            {codeSearchResults.length} código{codeSearchResults.length !== 1 ? "s" : ""} encontrado
+                            {codeSearchResults.length !== 1 ? "s" : ""}
+                          </span>
+                        </div>
+                        <div className="divide-y">
+                          {codeSearchResults.slice(0, 3).map((product) => (
+                            <div
+                              key={`code-${product.id}`}
+                              className="p-3 hover:bg-slate-50 transition-colors cursor-pointer"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-mono text-sm font-medium bg-blue-100 px-2 py-1 rounded text-blue-800">
+                                      {product.codigo}
+                                    </span>
+                                    <Badge variant="outline" className={getStockStatusColor(product)}>
+                                      {getStockStatusText(product)}
+                                    </Badge>
+                                  </div>
+                                  <h4 className="font-semibold text-slate-900 text-sm">{product.nombre}</h4>
+                                  <p className="text-xs text-slate-600 mt-1">
+                                    Stock: {product.stock} | {product.marca || "Sin marca"}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-sm font-bold text-green-600">
+                                    {formatCurrency(product.precio_venta)}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {codeSearchResults.length > 3 && (
+                          <div className="p-2 bg-slate-50 border-t text-center">
+                            <Button
+                              onClick={openCodeSearchModal}
+                              size="sm"
+                              variant="outline"
+                              className="text-xs bg-transparent"
+                            >
+                              Ver todos ({codeSearchResults.length})
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {codeSearchTerm && codeSearchResults.length === 0 && !codeSearchLoading && (
+                      <div className="text-center py-3 text-slate-500 bg-red-50 rounded-lg border border-red-200">
+                        <AlertTriangle className="w-6 h-6 mx-auto mb-1 text-red-400" />
+                        <p className="text-sm font-medium text-red-700">Código no encontrado</p>
+                        <p className="text-xs text-red-600">"{codeSearchTerm}"</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Búsqueda por Nombre/Descripción */}
@@ -326,11 +401,11 @@ const Dashboard = () => {
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
                       <Input
                         ref={nameSearchInputRef}
-                        placeholder="Nombre o descripción..."
+                        placeholder="Escribe el nombre del producto..."
                         value={nameSearchTerm}
                         onChange={(e) => setNameSearchTerm(e.target.value)}
                         onKeyDown={handleNameSearchKeyDown}
-                        className="pl-12 pr-12 h-12 text-lg border-slate-300 focus:border-slate-800"
+                        className="pl-12 pr-12 h-12 text-lg border-slate-300 focus:border-slate-800 focus:ring-2 focus:ring-slate-200"
                         autoComplete="off"
                       />
                       {nameSearchLoading && (
@@ -339,170 +414,85 @@ const Dashboard = () => {
                         </div>
                       )}
                     </div>
-                  </div>
-                </div>
 
-                {/* Resultados unificados */}
-                {(codeSearchResults.length > 0 || nameSearchResults.length > 0) && (
-                  <div className="border rounded-lg bg-white shadow-sm max-h-96 overflow-y-auto">
-                    <div className="p-3 bg-slate-50 border-b">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          {codeSearchResults.length > 0 && (
-                            <span className="text-sm font-medium text-blue-700 flex items-center gap-1">
-                              <Barcode className="w-4 h-4" />
-                              {codeSearchResults.length} por código
-                            </span>
-                          )}
-                          {nameSearchResults.length > 0 && (
-                            <span className="text-sm font-medium text-green-700 flex items-center gap-1">
-                              <Type className="w-4 h-4" />
-                              {nameSearchResults.length} por nombre
-                            </span>
-                          )}
+                    {/* Resultados de nombre en tiempo real */}
+                    {nameSearchResults.length > 0 && (
+                      <div className="border rounded-lg bg-white shadow-sm max-h-64 overflow-y-auto">
+                        <div className="p-2 bg-green-50 border-b">
+                          <span className="text-xs font-medium text-green-700 flex items-center gap-1">
+                            <Type className="w-3 h-3" />
+                            {nameSearchResults.length} producto{nameSearchResults.length !== 1 ? "s" : ""} encontrado
+                            {nameSearchResults.length !== 1 ? "s" : ""}
+                          </span>
                         </div>
-                        <Button
-                          onClick={() => {
-                            if (codeSearchResults.length > 0) {
-                              openCodeSearchModal()
-                            } else {
-                              openNameSearchModal()
-                            }
-                          }}
-                          size="sm"
-                          variant="outline"
-                          className="text-xs bg-transparent"
-                        >
-                          Ver detalles
-                          <ArrowRight className="w-3 h-3 ml-1" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="divide-y">
-                      {/* Mostrar resultados de código primero */}
-                      {codeSearchResults.slice(0, 3).map((product) => (
-                        <div key={`code-${product.id}`} className="p-4 hover:bg-slate-50 transition-colors">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                                    <Barcode className="w-3 h-3 mr-1" />
-                                    Código
-                                  </Badge>
-                                  <span className="font-mono text-sm font-medium">{product.codigo}</span>
+                        <div className="divide-y">
+                          {nameSearchResults.slice(0, 4).map((product) => (
+                            <div
+                              key={`name-${product.id}`}
+                              className="p-3 hover:bg-slate-50 transition-colors cursor-pointer"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded text-slate-700">
+                                      {product.codigo}
+                                    </span>
+                                    <Badge variant="outline" className={getStockStatusColor(product)}>
+                                      {getStockStatusText(product)}
+                                    </Badge>
+                                  </div>
+                                  <h4 className="font-semibold text-slate-900 text-sm">
+                                    {highlightSearchTerm(product.nombre, nameSearchTerm)}
+                                  </h4>
+                                  {product.descripcion && product.descripcion !== "Sin Descripción" && (
+                                    <p className="text-xs text-slate-600 mt-1 line-clamp-1">
+                                      {highlightSearchTerm(product.descripcion, nameSearchTerm)}
+                                    </p>
+                                  )}
+                                  <p className="text-xs text-slate-500 mt-1">
+                                    Stock: {product.stock} | {product.marca || "Sin marca"}
+                                  </p>
                                 </div>
-                                <Badge variant="outline" className={getStockStatusColor(product)}>
-                                  {getStockStatusText(product)}
-                                </Badge>
-                              </div>
-                              <h4 className="font-semibold text-slate-900 mt-1">{product.nombre}</h4>
-                              <div className="flex items-center gap-4 mt-2 text-sm text-slate-600">
-                                <span>
-                                  Stock: <strong>{product.stock}</strong>
-                                </span>
-                                <span>Marca: {product.marca || "Sin marca"}</span>
-                                <span>Categoría: {product.categoria_nombre}</span>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-lg font-bold text-green-600">
-                                {formatCurrency(product.precio_venta)}
-                              </div>
-                              <div className="text-sm text-slate-500">
-                                Costo: {formatCurrency(product.precio_costo)}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* Mostrar resultados de nombre */}
-                      {nameSearchResults.slice(0, codeSearchResults.length > 0 ? 2 : 5).map((product) => (
-                        <div key={`name-${product.id}`} className="p-4 hover:bg-slate-50 transition-colors">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                    <Type className="w-3 h-3 mr-1" />
-                                    Nombre
-                                  </Badge>
-                                  <span className="font-mono text-sm font-medium">{product.codigo}</span>
+                                <div className="text-right">
+                                  <div className="text-sm font-bold text-green-600">
+                                    {formatCurrency(product.precio_venta)}
+                                  </div>
                                 </div>
-                                <Badge variant="outline" className={getStockStatusColor(product)}>
-                                  {getStockStatusText(product)}
-                                </Badge>
-                              </div>
-                              <h4 className="font-semibold text-slate-900 mt-1">
-                                {highlightSearchTerm(product.nombre, nameSearchTerm)}
-                              </h4>
-                              {product.descripcion && product.descripcion !== "Sin Descripción" && (
-                                <p className="text-sm text-slate-600 mt-1">
-                                  {highlightSearchTerm(product.descripcion, nameSearchTerm)}
-                                </p>
-                              )}
-                              <div className="flex items-center gap-4 mt-2 text-sm text-slate-600">
-                                <span>
-                                  Stock: <strong>{product.stock}</strong>
-                                </span>
-                                <span>Marca: {product.marca || "Sin marca"}</span>
-                                <span>Categoría: {product.categoria_nombre}</span>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className="text-lg font-bold text-green-600">
-                                {formatCurrency(product.precio_venta)}
-                              </div>
-                              <div className="text-sm text-slate-500">
-                                Costo: {formatCurrency(product.precio_costo)}
-                              </div>
-                            </div>
-                          </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-
-                    {/* Footer de resultados */}
-                    {(codeSearchResults.length > 3 || nameSearchResults.length > 5) && (
-                      <div className="p-3 bg-slate-50 border-t text-center">
-                        <Button
-                          onClick={() => {
-                            if (codeSearchResults.length > 3) {
-                              openCodeSearchModal()
-                            } else {
-                              openNameSearchModal()
-                            }
-                          }}
-                          size="sm"
-                          variant="outline"
-                        >
-                          Ver todos los resultados
-                        </Button>
+                        {nameSearchResults.length > 4 && (
+                          <div className="p-2 bg-slate-50 border-t text-center">
+                            <Button
+                              onClick={openNameSearchModal}
+                              size="sm"
+                              variant="outline"
+                              className="text-xs bg-transparent"
+                            >
+                              Ver todos ({nameSearchResults.length})
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     )}
-                  </div>
-                )}
 
-                {/* Estados de búsqueda vacía */}
-                {codeSearchTerm && codeSearchResults.length === 0 && !codeSearchLoading && (
-                  <div className="text-center py-4 text-slate-500 bg-blue-50 rounded-lg border border-blue-200">
-                    <Barcode className="w-8 h-8 mx-auto mb-2 text-blue-400" />
-                    <p className="font-medium text-blue-700">No se encontró el código "{codeSearchTerm}"</p>
-                    <p className="text-sm text-blue-600">Verifica el código e intenta nuevamente</p>
-                  </div>
-                )}
+                    {nameSearchTerm &&
+                      nameSearchTerm.length >= 1 &&
+                      nameSearchResults.length === 0 &&
+                      !nameSearchLoading && (
+                        <div className="text-center py-3 text-slate-500 bg-orange-50 rounded-lg border border-orange-200">
+                          <Package className="w-6 h-6 mx-auto mb-1 text-orange-400" />
+                          <p className="text-sm font-medium text-orange-700">Sin resultados</p>
+                          <p className="text-xs text-orange-600">"{nameSearchTerm}"</p>
+                        </div>
+                      )}
 
-                {nameSearchTerm &&
-                  nameSearchTerm.length >= 1 &&
-                  nameSearchResults.length === 0 &&
-                  !nameSearchLoading && (
-                    <div className="text-center py-4 text-slate-500 bg-orange-50 rounded-lg border border-orange-200">
-                      <Package className="w-8 h-8 mx-auto mb-2 text-orange-400" />
-                      <p className="font-medium text-orange-700">No se encontraron productos con "{nameSearchTerm}"</p>
-                      <p className="text-sm text-orange-600">Intenta con otro término de búsqueda</p>
-                    </div>
-                  )}
+                    {nameSearchTerm && nameSearchTerm.length < 1 && (
+                      <div className="text-center py-2 text-slate-400 text-xs">Escribe para buscar productos...</div>
+                    )}
+                  </div>
+                </div>
 
                 {/* Botón para limpiar búsquedas */}
                 {(codeSearchTerm || nameSearchTerm) && (
@@ -511,7 +501,7 @@ const Dashboard = () => {
                       onClick={clearSearches}
                       variant="outline"
                       size="sm"
-                      className="text-slate-600 bg-transparent"
+                      className="text-slate-600 bg-transparent hover:bg-slate-50"
                     >
                       <X className="w-4 h-4 mr-2" />
                       Limpiar búsquedas

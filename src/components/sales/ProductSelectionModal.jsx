@@ -9,6 +9,9 @@ import { useProducts } from "../../hooks/useProducts"
 import SalesQuantityModal from "./SalesQuantityModal"
 
 const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: externalLoading = false }) => {
+  // Estado para controlar el tipo de búsqueda activa
+  const [searchType, setSearchType] = useState("name") // "name" o "code"
+
   // Referencias para los inputs
   const codeSearchInputRef = useRef(null)
   const nameSearchInputRef = useRef(null)
@@ -34,6 +37,30 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
   const codeSearchTimeoutRef = useRef(null)
   const nameSearchTimeoutRef = useRef(null)
 
+  // Función para cambiar el tipo de búsqueda
+  const handleSearchTypeChange = (newType) => {
+    setSearchType(newType)
+
+    // Limpiar búsquedas al cambiar de tipo
+    if (newType === "code") {
+      setNameSearchTerm("")
+      setNameSearchResults([])
+      setNameSearchLoading(false)
+      // Enfocar el input de código después de un pequeño delay
+      setTimeout(() => {
+        codeSearchInputRef.current?.focus()
+      }, 100)
+    } else {
+      setCodeSearchTerm("")
+      setCodeSearchResults([])
+      setCodeSearchLoading(false)
+      // Enfocar el input de nombre después de un pequeño delay
+      setTimeout(() => {
+        nameSearchInputRef.current?.focus()
+      }, 100)
+    }
+  }
+
   // Función para búsqueda por código - MEJORADA PARA MANTENER FOCO
   const handleCodeSearch = async (searchTerm) => {
     if (!searchTerm.trim()) {
@@ -41,7 +68,6 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
       return
     }
 
-    // No cambiar el estado de loading inmediatamente para evitar re-renders
     try {
       console.log("Buscando por código en modal:", searchTerm)
 
@@ -209,6 +235,19 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
     }
   }, [])
 
+  // Enfocar el input correcto cuando se abre el modal
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => {
+        if (searchType === "name") {
+          nameSearchInputRef.current?.focus()
+        } else {
+          codeSearchInputRef.current?.focus()
+        }
+      }, 200)
+    }
+  }, [isOpen, searchType])
+
   // Función para resaltar términos de búsqueda
   const highlightSearchTerm = (text, searchTerm) => {
     if (!searchTerm || !text) return text
@@ -261,6 +300,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
   // Limpiar estado al cerrar
   const handleClose = () => {
     clearSearches()
+    setSearchType("name") // Resetear a búsqueda por nombre por defecto
     onClose()
   }
 
@@ -397,187 +437,258 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
     )
   }
 
+  // Obtener los resultados y términos actuales según el tipo de búsqueda
+  const getCurrentSearchData = () => {
+    if (searchType === "code") {
+      return {
+        searchTerm: codeSearchTerm,
+        results: codeSearchResults,
+        loading: codeSearchLoading,
+        setSearchTerm: setCodeSearchTerm,
+      }
+    } else {
+      return {
+        searchTerm: nameSearchTerm,
+        results: nameSearchResults,
+        loading: nameSearchLoading,
+        setSearchTerm: setNameSearchTerm,
+      }
+    }
+  }
+
+  const currentSearch = getCurrentSearchData()
+
   if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[100] p-4">
-      <div className="bg-white shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden relative z-[101]">
+      <div className="bg-white shadow-xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden relative z-[101] rounded-xl">
         {/* Header */}
-        <div className="flex-shrink-0 flex items-center justify-between p-4 bg-slate-800">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-slate-600 rounded-lg flex items-center justify-center">
-              <Package className="w-4 h-4 text-white" />
+        <div className="flex-shrink-0 flex items-center justify-between p-6 bg-gradient-to-r from-slate-800 to-slate-700">
+          <div className="flex items-center space-x-4">
+            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm">
+              <Package className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-white">Seleccionar Productos</h2>
-              <p className="text-sm text-slate-300 mt-1">Búsqueda avanzada para agregar productos al carrito</p>
+              <h2 className="text-xl font-bold text-white">Seleccionar Productos</h2>
+              <p className="text-sm text-slate-200 mt-1">Encuentra y agrega productos a tu carrito</p>
             </div>
           </div>
           <Button
             onClick={handleClose}
             variant="ghost"
             size="sm"
-            className="text-slate-300 hover:text-white hover:bg-slate-700"
+            className="text-slate-200 hover:text-white hover:bg-white/10 rounded-lg"
             disabled={externalLoading}
           >
             <X className="w-5 h-5" />
           </Button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6" style={{ maxHeight: "calc(90vh - 120px)" }}>
-          <div className="space-y-6">
-            {/* Búsquedas duales */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Búsqueda por Código */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <Barcode className="w-4 h-4" />
-                  Búsqueda por Código
-                </div>
-                <div className="relative">
-                  <ScanLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                  <Input
-                    ref={codeSearchInputRef}
-                    placeholder="Escribe o escanea el código..."
-                    value={codeSearchTerm}
-                    onChange={(e) => setCodeSearchTerm(e.target.value)}
-                    className="pl-10 border-slate-300 focus:border-slate-800 focus:ring-2 focus:ring-slate-200"
-                    autoComplete="off"
-                    disabled={externalLoading}
-                  />
-                  {codeSearchLoading && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <RefreshCw className="w-4 h-4 animate-spin text-slate-600" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Resultados de código */}
-                {codeSearchResults.length > 0 && (
-                  <div className="border rounded-lg bg-white shadow-sm max-h-96 overflow-y-auto">
-                    <div className="p-2 bg-blue-50 border-b">
-                      <span className="text-xs font-medium text-blue-700 flex items-center gap-1">
-                        <Barcode className="w-3 h-3" />
-                        {codeSearchResults.length} código{codeSearchResults.length !== 1 ? "s" : ""} encontrado
-                        {codeSearchResults.length !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                    <div>
-                      {codeSearchResults.slice(0, 8).map((product) => renderProduct(product, codeSearchTerm, "code"))}
-                    </div>
-                    {codeSearchResults.length > 8 && (
-                      <div className="p-2 bg-slate-50 border-t text-center">
-                        <span className="text-xs text-slate-600">
-                          Mostrando 8 de {codeSearchResults.length} resultados
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {codeSearchTerm && codeSearchResults.length === 0 && !codeSearchLoading && (
-                  <div className="text-center py-4 text-slate-500 bg-red-50 rounded-lg border border-red-200">
-                    <AlertTriangle className="w-6 h-6 mx-auto mb-1 text-red-400" />
-                    <p className="text-sm font-medium text-red-700">Código no encontrado</p>
-                    <p className="text-xs text-red-600">"{codeSearchTerm}"</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Búsqueda por Nombre/Descripción */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+        {/* Toggle de tipo de búsqueda */}
+        <div className="flex-shrink-0 p-6 bg-slate-50 border-b">
+          <div className="flex items-center justify-center">
+            <div className="bg-white rounded-xl p-1 shadow-sm border border-slate-200">
+              <div className="flex">
+                <button
+                  onClick={() => handleSearchTypeChange("name")}
+                  className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
+                    searchType === "name"
+                      ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-md"
+                      : "text-slate-600 hover:text-slate-800 hover:bg-slate-50"
+                  }`}
+                >
                   <Type className="w-4 h-4" />
-                  Búsqueda por Nombre/Descripción
-                </div>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                  <Input
-                    ref={nameSearchInputRef}
-                    placeholder="Escribe el nombre del producto..."
-                    value={nameSearchTerm}
-                    onChange={(e) => setNameSearchTerm(e.target.value)}
-                    className="pl-10 border-slate-300 focus:border-slate-800 focus:ring-2 focus:ring-slate-200"
-                    autoComplete="off"
-                    disabled={externalLoading}
-                  />
-                  {nameSearchLoading && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <RefreshCw className="w-4 h-4 animate-spin text-slate-600" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Resultados de nombre */}
-                {nameSearchResults.length > 0 && (
-                  <div className="border rounded-lg bg-white shadow-sm max-h-96 overflow-y-auto">
-                    <div className="p-2 bg-green-50 border-b">
-                      <span className="text-xs font-medium text-green-700 flex items-center gap-1">
-                        <Type className="w-3 h-3" />
-                        {nameSearchResults.length} producto{nameSearchResults.length !== 1 ? "s" : ""} encontrado
-                        {nameSearchResults.length !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                    <div>
-                      {nameSearchResults.slice(0, 8).map((product) => renderProduct(product, nameSearchTerm, "name"))}
-                    </div>
-                    {nameSearchResults.length > 8 && (
-                      <div className="p-2 bg-slate-50 border-t text-center">
-                        <span className="text-xs text-slate-600">
-                          Mostrando 8 de {nameSearchResults.length} resultados
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {nameSearchTerm &&
-                  nameSearchTerm.length >= 1 &&
-                  nameSearchResults.length === 0 &&
-                  !nameSearchLoading && (
-                    <div className="text-center py-4 text-slate-500 bg-orange-50 rounded-lg border border-orange-200">
-                      <Package className="w-6 h-6 mx-auto mb-1 text-orange-400" />
-                      <p className="text-sm font-medium text-orange-700">Sin resultados</p>
-                      <p className="text-xs text-orange-600">"{nameSearchTerm}"</p>
-                    </div>
-                  )}
+                  <span>Buscar por Nombre</span>
+                </button>
+                <button
+                  onClick={() => handleSearchTypeChange("code")}
+                  className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
+                    searchType === "code"
+                      ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md"
+                      : "text-slate-600 hover:text-slate-800 hover:bg-slate-50"
+                  }`}
+                >
+                  <Barcode className="w-4 h-4" />
+                  <span>Buscar por Código</span>
+                </button>
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* Botón para limpiar búsquedas */}
-            {(codeSearchTerm || nameSearchTerm) && (
-              <div className="flex justify-center pt-2">
-                <Button
-                  onClick={clearSearches}
-                  variant="outline"
-                  size="sm"
-                  className="text-slate-600 bg-transparent hover:bg-slate-50"
-                  disabled={externalLoading}
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6" style={{ maxHeight: "calc(90vh - 200px)" }}>
+          <div className="max-w-4xl mx-auto space-y-6">
+            {/* Input de búsqueda único */}
+            <div className="space-y-4">
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-slate-800 mb-2">
+                  {searchType === "code" ? "Búsqueda por Código" : "Búsqueda por Nombre y Descripción"}
+                </h3>
+                <p className="text-sm text-slate-600">
+                  {searchType === "code"
+                    ? "Escribe o escanea el código del producto"
+                    : "Escribe el nombre, descripción o marca del producto"}
+                </p>
+              </div>
+
+              <div className="relative max-w-2xl mx-auto">
+                {searchType === "code" ? (
+                  <>
+                    <ScanLine className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <Input
+                      ref={codeSearchInputRef}
+                      placeholder="Escribe o escanea el código del producto..."
+                      value={codeSearchTerm}
+                      onChange={(e) => setCodeSearchTerm(e.target.value)}
+                      className="pl-12 pr-12 h-14 text-lg border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 rounded-xl shadow-sm"
+                      autoComplete="off"
+                      disabled={externalLoading}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <Input
+                      ref={nameSearchInputRef}
+                      placeholder="Escribe el nombre del producto..."
+                      value={nameSearchTerm}
+                      onChange={(e) => setNameSearchTerm(e.target.value)}
+                      className="pl-12 pr-12 h-14 text-lg border-2 border-slate-200 focus:border-green-500 focus:ring-4 focus:ring-green-100 rounded-xl shadow-sm"
+                      autoComplete="off"
+                      disabled={externalLoading}
+                    />
+                  </>
+                )}
+                {currentSearch.loading && (
+                  <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                    <RefreshCw className="w-5 h-5 animate-spin text-slate-600" />
+                  </div>
+                )}
+              </div>
+
+              {/* Botón para limpiar búsqueda */}
+              {currentSearch.searchTerm && (
+                <div className="flex justify-center">
+                  <Button
+                    onClick={() => currentSearch.setSearchTerm("")}
+                    variant="outline"
+                    size="sm"
+                    className="text-slate-600 bg-white hover:bg-slate-50 border-slate-200 rounded-lg"
+                    disabled={externalLoading}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Limpiar búsqueda
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Resultados */}
+            {currentSearch.results.length > 0 && (
+              <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div
+                  className={`p-4 border-b ${
+                    searchType === "code" ? "bg-blue-50 border-blue-100" : "bg-green-50 border-green-100"
+                  }`}
                 >
-                  <X className="w-4 h-4 mr-2" />
-                  Limpiar búsquedas
-                </Button>
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`text-sm font-semibold flex items-center gap-2 ${
+                        searchType === "code" ? "text-blue-800" : "text-green-800"
+                      }`}
+                    >
+                      {searchType === "code" ? <Barcode className="w-4 h-4" /> : <Type className="w-4 h-4" />}
+                      {currentSearch.results.length} producto{currentSearch.results.length !== 1 ? "s" : ""} encontrado
+                      {currentSearch.results.length !== 1 ? "s" : ""}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={
+                        searchType === "code"
+                          ? "bg-blue-100 text-blue-700 border-blue-200"
+                          : "bg-green-100 text-green-700 border-green-200"
+                      }
+                    >
+                      {searchType === "code" ? "Búsqueda por código" : "Búsqueda por nombre"}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="max-h-96 overflow-y-auto">
+                  {currentSearch.results
+                    .slice(0, 10)
+                    .map((product) => renderProduct(product, currentSearch.searchTerm, searchType))}
+                </div>
+                {currentSearch.results.length > 10 && (
+                  <div className="p-4 bg-slate-50 border-t text-center">
+                    <span className="text-sm text-slate-600">
+                      Mostrando 10 de {currentSearch.results.length} resultados
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
+            {/* Sin resultados */}
+            {currentSearch.searchTerm &&
+              currentSearch.searchTerm.length >= 1 &&
+              currentSearch.results.length === 0 &&
+              !currentSearch.loading && (
+                <div
+                  className={`text-center py-8 rounded-xl border-2 border-dashed ${
+                    searchType === "code" ? "bg-red-50 border-red-200" : "bg-orange-50 border-orange-200"
+                  }`}
+                >
+                  {searchType === "code" ? (
+                    <AlertTriangle className="w-12 h-12 mx-auto mb-3 text-red-400" />
+                  ) : (
+                    <Package className="w-12 h-12 mx-auto mb-3 text-orange-400" />
+                  )}
+                  <p
+                    className={`text-lg font-semibold mb-1 ${
+                      searchType === "code" ? "text-red-700" : "text-orange-700"
+                    }`}
+                  >
+                    {searchType === "code" ? "Código no encontrado" : "Sin resultados"}
+                  </p>
+                  <p className={`text-sm ${searchType === "code" ? "text-red-600" : "text-orange-600"}`}>
+                    No se encontraron productos para "{currentSearch.searchTerm}"
+                  </p>
+                </div>
+              )}
+
             {/* Estado inicial */}
-            {!codeSearchTerm && !nameSearchTerm && (
-              <div className="text-center py-12 text-slate-500">
-                <Search className="w-16 h-16 mx-auto mb-4 text-slate-300" />
-                <h3 className="font-medium text-lg mb-2">Busque productos para agregar</h3>
-                <p className="text-sm text-slate-400 mb-4">
-                  Use los campos de búsqueda para encontrar productos por código o nombre
+            {!currentSearch.searchTerm && (
+              <div className="text-center py-16">
+                <div
+                  className={`w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center ${
+                    searchType === "code" ? "bg-blue-100" : "bg-green-100"
+                  }`}
+                >
+                  {searchType === "code" ? (
+                    <ScanLine className="w-10 h-10 text-blue-600" />
+                  ) : (
+                    <Search className="w-10 h-10 text-green-600" />
+                  )}
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-3">
+                  {searchType === "code" ? "Escanea o escribe un código" : "Busca productos por nombre"}
+                </h3>
+                <p className="text-slate-600 mb-6 max-w-md mx-auto">
+                  {searchType === "code"
+                    ? "Utiliza el lector de códigos de barras o escribe el código manualmente para encontrar productos específicos."
+                    : "Escribe el nombre, descripción o marca del producto que estás buscando."}
                 </p>
-                <div className="space-y-2 text-xs text-slate-400">
+                <div className="space-y-2 text-sm text-slate-500">
                   <p>
-                    <strong>Búsqueda por código:</strong> Ideal para códigos de barras o códigos específicos
+                    <strong>Tip:</strong>{" "}
+                    {searchType === "code"
+                      ? "Los códigos de barras se pueden escanear directamente"
+                      : "Puedes buscar por palabras parciales"}
                   </p>
                   <p>
-                    <strong>Búsqueda por nombre:</strong> Busca en nombre, descripción y marca del producto
-                  </p>
-                  <p>
-                    <strong>Doble clic</strong> en cualquier producto o use el botón "Agregar" para seleccionar
+                    <strong>Doble clic</strong> en cualquier producto para agregarlo rápidamente
                   </p>
                 </div>
               </div>

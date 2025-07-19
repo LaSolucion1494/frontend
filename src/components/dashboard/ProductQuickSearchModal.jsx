@@ -3,10 +3,10 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog"
 import { Button } from "../ui/button"
 import { Badge } from "../ui/badge"
-import { Search, Package, Barcode, X, AlertTriangle, CheckCircle2, ExternalLink } from "lucide-react"
+import { Search, Package, Barcode, X, AlertTriangle, CheckCircle2, ExternalLink, Type } from "lucide-react"
 import { formatCurrency } from "../../lib/utils"
 
-const ProductQuickSearchModal = ({ isOpen, onClose, searchResults, searchTerm, onNavigateToStock }) => {
+const ProductQuickSearchModal = ({ isOpen, onClose, searchResults, searchTerm, searchType, onNavigateToStock }) => {
   // Función para obtener el color del estado de stock
   const getStockStatusColor = (product) => {
     const stockMinimo = product.stock_minimo || 5
@@ -28,18 +28,40 @@ const ProductQuickSearchModal = ({ isOpen, onClose, searchResults, searchTerm, o
     onClose()
   }
 
+  // Función para obtener el título según el tipo de búsqueda
+  const getSearchTitle = () => {
+    if (searchType === "code") {
+      return "Resultado de Búsqueda por Código"
+    } else if (searchType === "name") {
+      return "Resultados de Búsqueda por Nombre"
+    }
+    return "Resultados de Búsqueda"
+  }
+
+  // Función para obtener el icono según el tipo de búsqueda
+  const getSearchIcon = () => {
+    if (searchType === "code") {
+      return <Barcode className="w-5 h-5" />
+    } else if (searchType === "name") {
+      return <Type className="w-5 h-5" />
+    }
+    return <Search className="w-5 h-5" />
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Search className="w-5 h-5" />
-            Resultados de Búsqueda
+            {getSearchIcon()}
+            {getSearchTitle()}
           </DialogTitle>
           <DialogDescription>
             {searchResults.length} producto{searchResults.length !== 1 ? "s" : ""} encontrado
             {searchResults.length !== 1 ? "s" : ""}
             {searchTerm && ` para "${searchTerm}"`}
+            {searchType === "code" && " (búsqueda exacta por código)"}
+            {searchType === "name" && " (búsqueda por nombre/descripción)"}
           </DialogDescription>
         </DialogHeader>
 
@@ -70,6 +92,19 @@ const ProductQuickSearchModal = ({ isOpen, onClose, searchResults, searchTerm, o
                             {getStockStatusText(product)}
                           </div>
                         </Badge>
+                        {/* Indicador del tipo de búsqueda */}
+                        {searchType === "code" && (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            <Barcode className="w-3 h-3 mr-1" />
+                            Código exacto
+                          </Badge>
+                        )}
+                        {searchType === "name" && (
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                            <Type className="w-3 h-3 mr-1" />
+                            Por nombre
+                          </Badge>
+                        )}
                       </div>
 
                       {/* Nombre del producto */}
@@ -132,7 +167,11 @@ const ProductQuickSearchModal = ({ isOpen, onClose, searchResults, searchTerm, o
             <div className="text-center py-12">
               <Package className="w-16 h-16 mx-auto mb-4 text-slate-400" />
               <h3 className="text-lg font-medium text-slate-900 mb-2">No se encontraron productos</h3>
-              <p className="text-slate-600 mb-4">Intenta con otro término de búsqueda</p>
+              <p className="text-slate-600 mb-4">
+                {searchType === "code"
+                  ? "El código ingresado no existe en el sistema"
+                  : "Intenta con otro término de búsqueda"}
+              </p>
             </div>
           )}
         </div>
@@ -143,6 +182,8 @@ const ProductQuickSearchModal = ({ isOpen, onClose, searchResults, searchTerm, o
             {searchResults.length > 0 && (
               <span>
                 Mostrando {searchResults.length} resultado{searchResults.length !== 1 ? "s" : ""}
+                {searchType === "code" && " (búsqueda exacta)"}
+                {searchType === "name" && " (búsqueda por nombre)"}
               </span>
             )}
           </div>

@@ -71,16 +71,23 @@ export const useProducts = (initialFilters = {}) => {
     [filters],
   )
 
-  // NUEVA FUNCIÓN: Búsqueda específica para modales (similar a searchClients)
-  const searchProducts = useCallback(async (term) => {
-    if (!term || term.length < 2) {
+  // FUNCIÓN MEJORADA: Búsqueda específica para modales y búsqueda rápida
+  const searchProducts = useCallback(async (searchTerm, options = {}) => {
+    if (!searchTerm || searchTerm.trim().length < 1) {
       return { success: true, data: [] }
     }
 
     try {
-      console.log("useProducts.searchProducts - Buscando:", term)
-      const result = await productsService.search(term)
+      console.log("useProducts.searchProducts - Buscando:", searchTerm, options)
 
+      // Usar la función de búsqueda avanzada del servicio
+      const searchFilters = {
+        search: searchTerm.trim(),
+        limit: options.limit || 50,
+        ...options,
+      }
+
+      const result = await productsService.searchProducts(searchFilters)
       console.log("useProducts.searchProducts - Resultado:", result)
 
       if (result.success) {
@@ -96,6 +103,46 @@ export const useProducts = (initialFilters = {}) => {
       }
     } catch (error) {
       console.error("useProducts.searchProducts - Excepción:", error)
+
+      let errorMessage = "Error al buscar productos"
+
+      if (error.message?.includes("Network Error") || error.code === "ERR_NETWORK") {
+        errorMessage = "Error de conexión. Verifique su conexión a internet."
+      } else if (error.response?.status === 404) {
+        errorMessage = "Servicio de búsqueda no disponible."
+      } else if (error.response?.status >= 500) {
+        errorMessage = "Error del servidor. Intente nuevamente."
+      }
+
+      return { success: false, message: errorMessage, data: [] }
+    }
+  }, [])
+
+  // NUEVA FUNCIÓN: Búsqueda simple para compatibilidad
+  const searchProductsSimple = useCallback(async (term) => {
+    if (!term || term.length < 2) {
+      return { success: true, data: [] }
+    }
+
+    try {
+      console.log("useProducts.searchProductsSimple - Buscando:", term)
+      const result = await productsService.search(term)
+
+      console.log("useProducts.searchProductsSimple - Resultado:", result)
+
+      if (result.success) {
+        const formattedResults = result.data.map((product) => ({
+          ...product,
+          stock: product.stock || 0,
+          precio_venta: product.precio_venta || 0,
+        }))
+        return { success: true, data: formattedResults }
+      } else {
+        console.error("useProducts.searchProductsSimple - Error:", result.message)
+        return { success: false, message: result.message, data: [] }
+      }
+    } catch (error) {
+      console.error("useProducts.searchProductsSimple - Excepción:", error)
 
       let errorMessage = "Error al buscar productos"
 
@@ -251,7 +298,8 @@ export const useProducts = (initialFilters = {}) => {
     updateProduct,
     deleteProduct,
     getProductByCode,
-    searchProducts, // NUEVA función para modales
+    searchProducts, // Función principal de búsqueda
+    searchProductsSimple, // Función simple para compatibilidad
     searchProductsAdvanced, // Función avanzada (renombrada para claridad)
     updateSorting, // Mantener compatibilidad
     resetSorting, // Mantener compatibilidad

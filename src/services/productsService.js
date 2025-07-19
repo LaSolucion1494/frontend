@@ -55,12 +55,27 @@ export const productsService = {
     }
   },
 
-  // FUNCIÓN: Búsqueda específica para modales (sin paginación)
+  // FUNCIÓN MEJORADA: Búsqueda específica para modales (sin paginación)
   search: async (term) => {
     try {
-      const response = await apiClient.get(`/products/search?search=${encodeURIComponent(term)}&limit=50`)
-      return { success: true, data: response.data.data || response.data }
+      console.log("productsService.search called with term:", term)
+
+      if (!term || term.trim().length < 1) {
+        return { success: true, data: [] }
+      }
+
+      const response = await apiClient.get(`/products/search?search=${encodeURIComponent(term.trim())}&limit=50`)
+      console.log("Search response:", response.data)
+
+      if (response.data.success) {
+        return { success: true, data: response.data.data || [] }
+      } else {
+        // Compatibilidad con respuesta directa
+        const data = Array.isArray(response.data) ? response.data : response.data.data || []
+        return { success: true, data }
+      }
     } catch (error) {
+      console.error("Error in productsService.search:", error)
       return {
         success: false,
         message: error.response?.data?.message || "Error al buscar productos",
@@ -217,7 +232,7 @@ export const productsService = {
     }
   },
 
-  // Búsqueda de productos para dashboard (mantener compatibilidad)
+  // Búsqueda de productos para dashboard (mantener compatibilidad) - MEJORADA
   searchProducts: async (filters = {}) => {
     try {
       console.log("productsService.searchProducts called with filters:", filters)
@@ -243,10 +258,13 @@ export const productsService = {
           totalResults: response.data.totalResults,
         }
       } else {
+        // Compatibilidad con respuesta directa
+        const data = Array.isArray(response.data) ? response.data : response.data.data || []
         return {
-          success: false,
-          message: response.data.message || "Error en la búsqueda de productos",
-          data: [],
+          success: true,
+          data,
+          searchTerm: filters.search || "",
+          totalResults: data.length,
         }
       }
     } catch (error) {

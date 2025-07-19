@@ -69,7 +69,7 @@ const Dashboard = () => {
     fetchDashboardData()
   }, [fetchDashboardData])
 
-  // Función para búsqueda rápida por código
+  // Función para búsqueda rápida por código - CORREGIDA
   const handleCodeSearch = async (searchTerm) => {
     if (!searchTerm.trim()) {
       setCodeSearchResults([])
@@ -78,11 +78,14 @@ const Dashboard = () => {
 
     setCodeSearchLoading(true)
     try {
-      // Buscar códigos que contengan el término (búsqueda progresiva)
-      const searchResult = await searchProducts({
-        search: searchTerm.trim(),
+      console.log("Buscando por código:", searchTerm)
+
+      // Usar la función de búsqueda con filtros específicos para códigos
+      const searchResult = await searchProducts(searchTerm.trim(), {
         limit: 15,
       })
+
+      console.log("Resultado búsqueda código:", searchResult)
 
       if (searchResult.success) {
         // Filtrar y priorizar coincidencias de código
@@ -104,8 +107,10 @@ const Dashboard = () => {
             return 0
           })
 
+        console.log("Coincidencias de código encontradas:", codeMatches.length)
         setCodeSearchResults(codeMatches)
       } else {
+        console.error("Error en búsqueda por código:", searchResult.message)
         setCodeSearchResults([])
       }
     } catch (error) {
@@ -116,7 +121,7 @@ const Dashboard = () => {
     }
   }
 
-  // Función para búsqueda rápida por nombre/descripción
+  // Función para búsqueda rápida por nombre/descripción - CORREGIDA
   const handleNameSearch = async (searchTerm) => {
     if (!searchTerm.trim()) {
       setNameSearchResults([])
@@ -125,13 +130,16 @@ const Dashboard = () => {
 
     setNameSearchLoading(true)
     try {
-      const searchResult = await searchProducts({
-        search: searchTerm.trim(),
+      console.log("Buscando por nombre:", searchTerm)
+
+      const searchResult = await searchProducts(searchTerm.trim(), {
         limit: 20,
       })
 
+      console.log("Resultado búsqueda nombre:", searchResult)
+
       if (searchResult.success) {
-        // Filtrar productos que coincidan en nombre, descripción o marca (excluyendo códigos)
+        // Filtrar productos que coincidan en nombre, descripción o marca (excluyendo solo códigos)
         const nameMatches = searchResult.data
           .filter((product) => {
             const term = searchTerm.toLowerCase()
@@ -140,8 +148,9 @@ const Dashboard = () => {
             const matchesBrand = product.marca && product.marca.toLowerCase().includes(term)
             const matchesCode = product.codigo.toLowerCase().includes(term)
 
-            // Incluir si coincide en nombre, descripción o marca, pero no solo en código
-            return (matchesName || matchesDescription || matchesBrand) && !matchesCode
+            // Incluir si coincide en nombre, descripción o marca
+            // También incluir si coincide en código, pero dar prioridad a nombre/descripción/marca
+            return matchesName || matchesDescription || matchesBrand || matchesCode
           })
           .sort((a, b) => {
             const term = searchTerm.toLowerCase()
@@ -162,8 +171,10 @@ const Dashboard = () => {
             return a.nombre.localeCompare(b.nombre)
           })
 
+        console.log("Coincidencias de nombre encontradas:", nameMatches.length)
         setNameSearchResults(nameMatches)
       } else {
+        console.error("Error en búsqueda por nombre:", searchResult.message)
         setNameSearchResults([])
       }
     } catch (error) {
@@ -174,19 +185,27 @@ const Dashboard = () => {
     }
   }
 
-  // Debounce más rápido y responsivo
+  // Debounce mejorado y más responsivo
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      handleCodeSearch(codeSearchTerm)
-    }, 100) // Muy rápido para códigos
+      if (codeSearchTerm.trim()) {
+        handleCodeSearch(codeSearchTerm)
+      } else {
+        setCodeSearchResults([])
+      }
+    }, 200) // Reducido para mejor responsividad
 
     return () => clearTimeout(timeoutId)
   }, [codeSearchTerm])
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      handleNameSearch(nameSearchTerm)
-    }, 150) // Rápido para nombres
+      if (nameSearchTerm.trim()) {
+        handleNameSearch(nameSearchTerm)
+      } else {
+        setNameSearchResults([])
+      }
+    }, 300) // Ligeramente más lento para nombres
 
     return () => clearTimeout(timeoutId)
   }, [nameSearchTerm])
@@ -442,11 +461,19 @@ const Dashboard = () => {
                                     </Badge>
                                   </div>
                                   <h4 className="font-semibold text-slate-900 text-sm">
-                                    {highlightSearchTerm(product.nombre, nameSearchTerm)}
+                                    <span
+                                      dangerouslySetInnerHTML={{
+                                        __html: highlightSearchTerm(product.nombre, nameSearchTerm),
+                                      }}
+                                    />
                                   </h4>
                                   {product.descripcion && product.descripcion !== "Sin Descripción" && (
                                     <p className="text-xs text-slate-600 mt-1 line-clamp-1">
-                                      {highlightSearchTerm(product.descripcion, nameSearchTerm)}
+                                      <span
+                                        dangerouslySetInnerHTML={{
+                                          __html: highlightSearchTerm(product.descripcion, nameSearchTerm),
+                                        }}
+                                      />
                                     </p>
                                   )}
                                   <p className="text-xs text-slate-500 mt-1">

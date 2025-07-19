@@ -264,9 +264,9 @@ const Dashboard = () => {
     return "Disponible"
   }
 
-  // Función para resaltar el término de búsqueda en el nombre del producto
+  // Función para resaltar el término de búsqueda en el texto
   const highlightSearchTerm = (text, searchTerm) => {
-    if (!searchTerm) return text
+    if (!searchTerm || !text) return text
     const regex = new RegExp(`(${searchTerm})`, "gi")
     return text.replace(regex, '<mark class="bg-yellow-200">$1</mark>')
   }
@@ -322,7 +322,7 @@ const Dashboard = () => {
               <div className="space-y-6">
                 {/* Inputs de búsqueda lado a lado - MEJORADO */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Búsqueda por Código */}
+                  {/* Búsqueda por Código - MEJORADA CON DESCRIPCIÓN */}
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
                       <Barcode className="w-4 h-4" />
@@ -346,9 +346,9 @@ const Dashboard = () => {
                       )}
                     </div>
 
-                    {/* Resultados de código en tiempo real */}
+                    {/* Resultados de código en tiempo real - MEJORADOS CON DESCRIPCIÓN */}
                     {codeSearchResults.length > 0 && (
-                      <div className="border rounded-lg bg-white shadow-sm max-h-64 overflow-y-auto">
+                      <div className="border rounded-lg bg-white shadow-sm max-h-80 overflow-y-auto">
                         <div className="p-2 bg-blue-50 border-b">
                           <span className="text-xs font-medium text-blue-700 flex items-center gap-1">
                             <Barcode className="w-3 h-3" />
@@ -362,24 +362,45 @@ const Dashboard = () => {
                               key={`code-${product.id}`}
                               className="p-3 hover:bg-slate-50 transition-colors cursor-pointer"
                             >
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-2">
                                     <span className="font-mono text-sm font-medium bg-blue-100 px-2 py-1 rounded text-blue-800">
-                                      {product.codigo}
+                                      <span
+                                        dangerouslySetInnerHTML={{
+                                          __html: highlightSearchTerm(product.codigo, codeSearchTerm),
+                                        }}
+                                      />
                                     </span>
                                     <Badge variant="outline" className={getStockStatusColor(product)}>
                                       {getStockStatusText(product)}
                                     </Badge>
                                   </div>
-                                  <h4 className="font-semibold text-slate-900 text-sm">{product.nombre}</h4>
-                                  <p className="text-xs text-slate-600 mt-1">
-                                    Stock: {product.stock} | {product.marca || "Sin marca"}
-                                  </p>
+                                  <h4 className="font-semibold text-slate-900 text-sm mb-1 line-clamp-1">
+                                    {product.nombre}
+                                  </h4>
+                                  {/* NUEVA: Mostrar descripción en búsqueda por código */}
+                                  {product.descripcion && product.descripcion !== "Sin Descripción" && (
+                                    <p className="text-xs text-slate-600 mb-2 line-clamp-2">
+                                      <span
+                                        dangerouslySetInnerHTML={{
+                                          __html: highlightSearchTerm(product.descripcion, codeSearchTerm),
+                                        }}
+                                      />
+                                    </p>
+                                  )}
+                                  <div className="flex items-center gap-4 text-xs text-slate-500">
+                                    <span>Stock: {product.stock}</span>
+                                    <span>Marca: {product.marca || "Sin marca"}</span>
+                                    <span>Cat: {product.categoria_nombre || "Sin categoría"}</span>
+                                  </div>
                                 </div>
-                                <div className="text-right">
+                                <div className="text-right ml-3 flex-shrink-0">
                                   <div className="text-sm font-bold text-green-600">
                                     {formatCurrency(product.precio_venta)}
+                                  </div>
+                                  <div className="text-xs text-slate-500 mt-1">
+                                    Costo: {formatCurrency(product.precio_costo)}
                                   </div>
                                 </div>
                               </div>
@@ -436,7 +457,7 @@ const Dashboard = () => {
 
                     {/* Resultados de nombre en tiempo real */}
                     {nameSearchResults.length > 0 && (
-                      <div className="border rounded-lg bg-white shadow-sm max-h-64 overflow-y-auto">
+                      <div className="border rounded-lg bg-white shadow-sm max-h-80 overflow-y-auto">
                         <div className="p-2 bg-green-50 border-b">
                           <span className="text-xs font-medium text-green-700 flex items-center gap-1">
                             <Type className="w-3 h-3" />
@@ -450,8 +471,8 @@ const Dashboard = () => {
                               key={`name-${product.id}`}
                               className="p-3 hover:bg-slate-50 transition-colors cursor-pointer"
                             >
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-1">
                                     <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded text-slate-700">
                                       {product.codigo}
@@ -460,7 +481,7 @@ const Dashboard = () => {
                                       {getStockStatusText(product)}
                                     </Badge>
                                   </div>
-                                  <h4 className="font-semibold text-slate-900 text-sm">
+                                  <h4 className="font-semibold text-slate-900 text-sm mb-1">
                                     <span
                                       dangerouslySetInnerHTML={{
                                         __html: highlightSearchTerm(product.nombre, nameSearchTerm),
@@ -468,7 +489,7 @@ const Dashboard = () => {
                                     />
                                   </h4>
                                   {product.descripcion && product.descripcion !== "Sin Descripción" && (
-                                    <p className="text-xs text-slate-600 mt-1 line-clamp-1">
+                                    <p className="text-xs text-slate-600 mb-2 line-clamp-2">
                                       <span
                                         dangerouslySetInnerHTML={{
                                           __html: highlightSearchTerm(product.descripcion, nameSearchTerm),
@@ -476,13 +497,18 @@ const Dashboard = () => {
                                       />
                                     </p>
                                   )}
-                                  <p className="text-xs text-slate-500 mt-1">
-                                    Stock: {product.stock} | {product.marca || "Sin marca"}
-                                  </p>
+                                  <div className="flex items-center gap-4 text-xs text-slate-500">
+                                    <span>Stock: {product.stock}</span>
+                                    <span>Marca: {product.marca || "Sin marca"}</span>
+                                    <span>Cat: {product.categoria_nombre || "Sin categoría"}</span>
+                                  </div>
                                 </div>
-                                <div className="text-right">
+                                <div className="text-right ml-3 flex-shrink-0">
                                   <div className="text-sm font-bold text-green-600">
                                     {formatCurrency(product.precio_venta)}
+                                  </div>
+                                  <div className="text-xs text-slate-500 mt-1">
+                                    Costo: {formatCurrency(product.precio_costo)}
                                   </div>
                                 </div>
                               </div>

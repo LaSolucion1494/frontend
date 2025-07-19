@@ -69,7 +69,31 @@ const Dashboard = () => {
     fetchDashboardData()
   }, [fetchDashboardData])
 
-  // Función para búsqueda rápida por código
+  // Función para limpiar búsquedas
+  const clearSearches = () => {
+    setCodeSearchTerm("")
+    setNameSearchTerm("")
+    setCodeSearchResults([])
+    setNameSearchResults([])
+  }
+
+  // Función para obtener el color del estado de stock
+  const getStockStatusColor = (product) => {
+    const stockMinimo = product.stock_minimo || 5
+    if (product.stock === 0) return "text-red-600 bg-red-50 border-red-200"
+    if (product.stock <= stockMinimo) return "text-orange-600 bg-orange-50 border-orange-200"
+    return "text-green-600 bg-green-50 border-green-200"
+  }
+
+  // Función para obtener el texto del estado de stock
+  const getStockStatusText = (product) => {
+    const stockMinimo = product.stock_minimo || 5
+    if (product.stock === 0) return "Sin stock"
+    if (product.stock <= stockMinimo) return "Stock bajo"
+    return "Disponible"
+  }
+
+  // Función mejorada para búsqueda por código (más flexible)
   const handleCodeSearch = async (searchTerm) => {
     if (!searchTerm.trim()) {
       setCodeSearchResults([])
@@ -78,10 +102,28 @@ const Dashboard = () => {
 
     setCodeSearchLoading(true)
     try {
-      // Búsqueda exacta por código
-      const exactResult = await getProductByCode(searchTerm.trim())
-      if (exactResult.success) {
-        setCodeSearchResults([exactResult.data])
+      // Primero intentar búsqueda exacta por código
+      if (searchTerm.length >= 3) {
+        const exactResult = await getProductByCode(searchTerm.trim())
+        if (exactResult.success) {
+          setCodeSearchResults([exactResult.data])
+          setCodeSearchLoading(false)
+          return
+        }
+      }
+
+      // Si no encuentra exacto, buscar códigos que contengan el término
+      const searchResult = await searchProducts({
+        search: searchTerm.trim(),
+        limit: 10,
+      })
+
+      if (searchResult.success) {
+        // Filtrar solo productos cuyo código contenga el término de búsqueda
+        const codeMatches = searchResult.data.filter((product) =>
+          product.codigo.toLowerCase().includes(searchTerm.toLowerCase()),
+        )
+        setCodeSearchResults(codeMatches)
       } else {
         setCodeSearchResults([])
       }
@@ -93,23 +135,30 @@ const Dashboard = () => {
     }
   }
 
-  // Función para búsqueda rápida por nombre/descripción
+  // Función mejorada para búsqueda por nombre (más progresiva)
   const handleNameSearch = async (searchTerm) => {
-    if (!searchTerm.trim() || searchTerm.trim().length < 2) {
+    if (!searchTerm.trim() || searchTerm.trim().length < 1) {
       setNameSearchResults([])
       return
     }
 
     setNameSearchLoading(true)
     try {
-      // Búsqueda por nombre/descripción
       const searchResult = await searchProducts({
         search: searchTerm.trim(),
-        limit: 10,
+        limit: 15,
       })
 
       if (searchResult.success) {
-        setNameSearchResults(searchResult.data || [])
+        // Filtrar productos que NO sean coincidencias exactas de código
+        const nameMatches = searchResult.data.filter(
+          (product) =>
+            !product.codigo.toLowerCase().includes(searchTerm.toLowerCase()) &&
+            (product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              (product.descripcion && product.descripcion.toLowerCase().includes(searchTerm.toLowerCase())) ||
+              (product.marca && product.marca.toLowerCase().includes(searchTerm.toLowerCase()))),
+        )
+        setNameSearchResults(nameMatches)
       } else {
         setNameSearchResults([])
       }
@@ -121,20 +170,42 @@ const Dashboard = () => {
     }
   }
 
-  // Debounce para búsqueda por código
+  // Función para resaltar términos de búsqueda
+  const highlightSearchTerm = (text, searchTerm) => {
+    if (!searchTerm || !text) return text
+
+    const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi")
+    const parts = text.split(regex)
+
+    return (
+      <span>
+        {parts.map((part, index) =>
+          regex.test(part) ? (
+            <mark key={index} className="bg-yellow-200 px-1 rounded">
+              {part}
+            </mark>
+          ) : (
+            part
+          ),
+        )}
+      </span>
+    )
+  }
+
+  // Debounce mejorado para búsqueda por código (más rápido)
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       handleCodeSearch(codeSearchTerm)
-    }, 300)
+    }, 150) // Reducido a 150ms para mayor rapidez
 
     return () => clearTimeout(timeoutId)
   }, [codeSearchTerm])
 
-  // Debounce para búsqueda por nombre
+  // Debounce mejorado para búsqueda por nombre (más progresivo)
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       handleNameSearch(nameSearchTerm)
-    }, 500) // Un poco más de delay para nombre
+    }, 200) // Reducido a 200ms para búsqueda progresiva
 
     return () => clearTimeout(timeoutId)
   }, [nameSearchTerm])
@@ -167,30 +238,6 @@ const Dashboard = () => {
     if (e.key === "Enter" && nameSearchResults.length > 0) {
       openNameSearchModal()
     }
-  }
-
-  // Función para limpiar búsquedas
-  const clearSearches = () => {
-    setCodeSearchTerm("")
-    setNameSearchTerm("")
-    setCodeSearchResults([])
-    setNameSearchResults([])
-  }
-
-  // Función para obtener el color del estado de stock
-  const getStockStatusColor = (product) => {
-    const stockMinimo = product.stock_minimo || 5
-    if (product.stock === 0) return "text-red-600 bg-red-50 border-red-200"
-    if (product.stock <= stockMinimo) return "text-orange-600 bg-orange-50 border-orange-200"
-    return "text-green-600 bg-green-50 border-green-200"
-  }
-
-  // Función para obtener el texto del estado de stock
-  const getStockStatusText = (product) => {
-    const stockMinimo = product.stock_minimo || 5
-    if (product.stock === 0) return "Sin stock"
-    if (product.stock <= stockMinimo) return "Stock bajo"
-    return "Disponible"
   }
 
   if (dashboardLoading) {
@@ -237,59 +284,112 @@ const Dashboard = () => {
                 Búsqueda Rápida de Productos
               </CardTitle>
               <CardDescription className="text-slate-200">
-                Busca productos por código de barras o por nombre/descripción
+                Busca productos por código o por nombre/descripción de forma instantánea
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6">
               <div className="space-y-6">
-                {/* Búsqueda por Código */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                    <Barcode className="w-4 h-4" />
-                    Búsqueda por Código
-                  </div>
-                  <div className="relative">
-                    <ScanLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
-                    <Input
-                      ref={codeSearchInputRef}
-                      placeholder="Escanea o escribe el código del producto..."
-                      value={codeSearchTerm}
-                      onChange={(e) => setCodeSearchTerm(e.target.value)}
-                      onKeyDown={handleCodeSearchKeyDown}
-                      className="pl-12 pr-12 h-12 text-lg border-slate-300 focus:border-slate-800"
-                      autoComplete="off"
-                    />
-                    {codeSearchLoading && (
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                        <RefreshCw className="w-5 h-5 animate-spin text-slate-600" />
-                      </div>
-                    )}
+                {/* Inputs de búsqueda lado a lado */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Búsqueda por Código */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                      <Barcode className="w-4 h-4" />
+                      Búsqueda por Código
+                    </div>
+                    <div className="relative">
+                      <ScanLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+                      <Input
+                        ref={codeSearchInputRef}
+                        placeholder="Código del producto..."
+                        value={codeSearchTerm}
+                        onChange={(e) => setCodeSearchTerm(e.target.value)}
+                        onKeyDown={handleCodeSearchKeyDown}
+                        className="pl-12 pr-12 h-12 text-lg border-slate-300 focus:border-slate-800"
+                        autoComplete="off"
+                      />
+                      {codeSearchLoading && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <RefreshCw className="w-5 h-5 animate-spin text-slate-600" />
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Resultados de búsqueda por código */}
-                  {codeSearchResults.length > 0 && (
-                    <div className="border rounded-lg bg-white shadow-sm">
-                      <div className="p-3 bg-blue-50 border-b">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-blue-700">Producto encontrado por código</span>
-                          <Button
-                            onClick={openCodeSearchModal}
-                            size="sm"
-                            variant="outline"
-                            className="text-xs bg-transparent border-blue-300 text-blue-700 hover:bg-blue-100"
-                          >
-                            Ver detalles
-                            <ArrowRight className="w-3 h-3 ml-1" />
-                          </Button>
+                  {/* Búsqueda por Nombre/Descripción */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                      <Type className="w-4 h-4" />
+                      Búsqueda por Nombre/Descripción
+                    </div>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+                      <Input
+                        ref={nameSearchInputRef}
+                        placeholder="Nombre o descripción..."
+                        value={nameSearchTerm}
+                        onChange={(e) => setNameSearchTerm(e.target.value)}
+                        onKeyDown={handleNameSearchKeyDown}
+                        className="pl-12 pr-12 h-12 text-lg border-slate-300 focus:border-slate-800"
+                        autoComplete="off"
+                      />
+                      {nameSearchLoading && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <RefreshCw className="w-5 h-5 animate-spin text-slate-600" />
                         </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Resultados unificados */}
+                {(codeSearchResults.length > 0 || nameSearchResults.length > 0) && (
+                  <div className="border rounded-lg bg-white shadow-sm max-h-96 overflow-y-auto">
+                    <div className="p-3 bg-slate-50 border-b">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          {codeSearchResults.length > 0 && (
+                            <span className="text-sm font-medium text-blue-700 flex items-center gap-1">
+                              <Barcode className="w-4 h-4" />
+                              {codeSearchResults.length} por código
+                            </span>
+                          )}
+                          {nameSearchResults.length > 0 && (
+                            <span className="text-sm font-medium text-green-700 flex items-center gap-1">
+                              <Type className="w-4 h-4" />
+                              {nameSearchResults.length} por nombre
+                            </span>
+                          )}
+                        </div>
+                        <Button
+                          onClick={() => {
+                            if (codeSearchResults.length > 0) {
+                              openCodeSearchModal()
+                            } else {
+                              openNameSearchModal()
+                            }
+                          }}
+                          size="sm"
+                          variant="outline"
+                          className="text-xs bg-transparent"
+                        >
+                          Ver detalles
+                          <ArrowRight className="w-3 h-3 ml-1" />
+                        </Button>
                       </div>
-                      <div className="p-4">
-                        {codeSearchResults.map((product) => (
-                          <div key={product.id} className="flex items-center justify-between">
+                    </div>
+                    <div className="divide-y">
+                      {/* Mostrar resultados de código primero */}
+                      {codeSearchResults.slice(0, 3).map((product) => (
+                        <div key={`code-${product.id}`} className="p-4 hover:bg-slate-50 transition-colors">
+                          <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-2">
-                                  <Barcode className="w-4 h-4 text-slate-500" />
+                                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                    <Barcode className="w-3 h-3 mr-1" />
+                                    Código
+                                  </Badge>
                                   <span className="font-mono text-sm font-medium">{product.codigo}</span>
                                 </div>
                                 <Badge variant="outline" className={getStockStatusColor(product)}>
@@ -314,136 +414,95 @@ const Dashboard = () => {
                               </div>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {codeSearchTerm && codeSearchResults.length === 0 && !codeSearchLoading && (
-                    <div className="text-center py-4 text-slate-500 bg-red-50 rounded-lg border border-red-200">
-                      <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-red-400" />
-                      <p className="font-medium text-red-700">Código no encontrado</p>
-                      <p className="text-sm text-red-600">Verifica el código e intenta nuevamente</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Separador */}
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-slate-300" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-gray-50 px-2 text-slate-500">O</span>
-                  </div>
-                </div>
-
-                {/* Búsqueda por Nombre/Descripción */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                    <Type className="w-4 h-4" />
-                    Búsqueda por Nombre o Descripción
-                  </div>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
-                    <Input
-                      ref={nameSearchInputRef}
-                      placeholder="Escribe el nombre o descripción del producto..."
-                      value={nameSearchTerm}
-                      onChange={(e) => setNameSearchTerm(e.target.value)}
-                      onKeyDown={handleNameSearchKeyDown}
-                      className="pl-12 pr-12 h-12 text-lg border-slate-300 focus:border-slate-800"
-                      autoComplete="off"
-                    />
-                    {nameSearchLoading && (
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                        <RefreshCw className="w-5 h-5 animate-spin text-slate-600" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Resultados de búsqueda por nombre */}
-                  {nameSearchResults.length > 0 && (
-                    <div className="border rounded-lg bg-white shadow-sm max-h-96 overflow-y-auto">
-                      <div className="p-3 bg-green-50 border-b">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-green-700">
-                            {nameSearchResults.length} producto{nameSearchResults.length !== 1 ? "s" : ""} encontrado
-                            {nameSearchResults.length !== 1 ? "s" : ""}
-                          </span>
-                          <Button
-                            onClick={openNameSearchModal}
-                            size="sm"
-                            variant="outline"
-                            className="text-xs bg-transparent border-green-300 text-green-700 hover:bg-green-100"
-                          >
-                            Ver todos
-                            <ArrowRight className="w-3 h-3 ml-1" />
-                          </Button>
                         </div>
-                      </div>
-                      <div className="divide-y">
-                        {nameSearchResults.slice(0, 5).map((product) => (
-                          <div key={product.id} className="p-4 hover:bg-slate-50 transition-colors">
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3">
-                                  <div className="flex items-center gap-2">
-                                    <Barcode className="w-4 h-4 text-slate-500" />
-                                    <span className="font-mono text-sm font-medium">{product.codigo}</span>
-                                  </div>
-                                  <Badge variant="outline" className={getStockStatusColor(product)}>
-                                    {getStockStatusText(product)}
+                      ))}
+
+                      {/* Mostrar resultados de nombre */}
+                      {nameSearchResults.slice(0, codeSearchResults.length > 0 ? 2 : 5).map((product) => (
+                        <div key={`name-${product.id}`} className="p-4 hover:bg-slate-50 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                    <Type className="w-3 h-3 mr-1" />
+                                    Nombre
                                   </Badge>
+                                  <span className="font-mono text-sm font-medium">{product.codigo}</span>
                                 </div>
-                                <h4 className="font-semibold text-slate-900 mt-1">{product.nombre}</h4>
-                                <div className="flex items-center gap-4 mt-2 text-sm text-slate-600">
-                                  <span>
-                                    Stock: <strong>{product.stock}</strong>
-                                  </span>
-                                  <span>Marca: {product.marca || "Sin marca"}</span>
-                                  <span>Categoría: {product.categoria_nombre}</span>
-                                </div>
+                                <Badge variant="outline" className={getStockStatusColor(product)}>
+                                  {getStockStatusText(product)}
+                                </Badge>
                               </div>
-                              <div className="text-right">
-                                <div className="text-lg font-bold text-green-600">
-                                  {formatCurrency(product.precio_venta)}
-                                </div>
-                                <div className="text-sm text-slate-500">
-                                  Costo: {formatCurrency(product.precio_costo)}
-                                </div>
+                              <h4 className="font-semibold text-slate-900 mt-1">
+                                {highlightSearchTerm(product.nombre, nameSearchTerm)}
+                              </h4>
+                              {product.descripcion && product.descripcion !== "Sin Descripción" && (
+                                <p className="text-sm text-slate-600 mt-1">
+                                  {highlightSearchTerm(product.descripcion, nameSearchTerm)}
+                                </p>
+                              )}
+                              <div className="flex items-center gap-4 mt-2 text-sm text-slate-600">
+                                <span>
+                                  Stock: <strong>{product.stock}</strong>
+                                </span>
+                                <span>Marca: {product.marca || "Sin marca"}</span>
+                                <span>Categoría: {product.categoria_nombre}</span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-lg font-bold text-green-600">
+                                {formatCurrency(product.precio_venta)}
+                              </div>
+                              <div className="text-sm text-slate-500">
+                                Costo: {formatCurrency(product.precio_costo)}
                               </div>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                      {nameSearchResults.length > 5 && (
-                        <div className="p-3 bg-slate-50 border-t text-center">
-                          <Button onClick={openNameSearchModal} size="sm" variant="outline">
-                            Ver todos los {nameSearchResults.length} resultados
-                          </Button>
                         </div>
-                      )}
+                      ))}
                     </div>
-                  )}
 
-                  {nameSearchTerm &&
-                    nameSearchTerm.length >= 2 &&
-                    nameSearchResults.length === 0 &&
-                    !nameSearchLoading && (
-                      <div className="text-center py-4 text-slate-500 bg-orange-50 rounded-lg border border-orange-200">
-                        <Package className="w-8 h-8 mx-auto mb-2 text-orange-400" />
-                        <p className="font-medium text-orange-700">No se encontraron productos</p>
-                        <p className="text-sm text-orange-600">Intenta con otro nombre o descripción</p>
+                    {/* Footer de resultados */}
+                    {(codeSearchResults.length > 3 || nameSearchResults.length > 5) && (
+                      <div className="p-3 bg-slate-50 border-t text-center">
+                        <Button
+                          onClick={() => {
+                            if (codeSearchResults.length > 3) {
+                              openCodeSearchModal()
+                            } else {
+                              openNameSearchModal()
+                            }
+                          }}
+                          size="sm"
+                          variant="outline"
+                        >
+                          Ver todos los resultados
+                        </Button>
                       </div>
                     )}
+                  </div>
+                )}
 
-                  {nameSearchTerm && nameSearchTerm.length < 2 && nameSearchTerm.length > 0 && (
-                    <div className="text-center py-2 text-slate-400 text-sm">
-                      Escribe al menos 2 caracteres para buscar
+                {/* Estados de búsqueda vacía */}
+                {codeSearchTerm && codeSearchResults.length === 0 && !codeSearchLoading && (
+                  <div className="text-center py-4 text-slate-500 bg-blue-50 rounded-lg border border-blue-200">
+                    <Barcode className="w-8 h-8 mx-auto mb-2 text-blue-400" />
+                    <p className="font-medium text-blue-700">No se encontró el código "{codeSearchTerm}"</p>
+                    <p className="text-sm text-blue-600">Verifica el código e intenta nuevamente</p>
+                  </div>
+                )}
+
+                {nameSearchTerm &&
+                  nameSearchTerm.length >= 1 &&
+                  nameSearchResults.length === 0 &&
+                  !nameSearchLoading && (
+                    <div className="text-center py-4 text-slate-500 bg-orange-50 rounded-lg border border-orange-200">
+                      <Package className="w-8 h-8 mx-auto mb-2 text-orange-400" />
+                      <p className="font-medium text-orange-700">No se encontraron productos con "{nameSearchTerm}"</p>
+                      <p className="text-sm text-orange-600">Intenta con otro término de búsqueda</p>
                     </div>
                   )}
-                </div>
 
                 {/* Botón para limpiar búsquedas */}
                 {(codeSearchTerm || nameSearchTerm) && (

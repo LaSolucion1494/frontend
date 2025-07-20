@@ -278,19 +278,6 @@ const Cotizaciones = () => {
       <div className="max-w-[95rem] mx-auto px-4 py-6 min-h-screen">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-purple-600">
-                  <FileText className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Nueva Cotización</h1>
-                  <p className="text-sm text-gray-600">Crea cotizaciones para clientes sin afectar el stock</p>
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* Indicador de estado cuando hay productos */}
           {cartProducts.length > 0 && (

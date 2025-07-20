@@ -462,7 +462,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onProductSelect, loading: exte
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[100] p-4">
-      <div className="bg-white shadow-xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden relative z-[101] rounded-xl">
+      <div className="bg-white shadow-xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden relative z-[101]">
         {/* Header */}
         <div className="flex-shrink-0 flex items-center justify-between p-6 bg-gradient-to-r from-slate-800 to-slate-700">
           <div className="flex items-center space-x-4">

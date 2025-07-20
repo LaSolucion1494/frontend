@@ -36,9 +36,8 @@ const NavLink = ({ to, children, onClick }) => {
     <Link
       to={to}
       onClick={onClick}
-      className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-        isActive ? "bg-slate-700 text-white" : "text-slate-300 hover:bg-slate-700/50 hover:text-white"
-      }`}
+      className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? "bg-slate-700 text-white" : "text-slate-300 hover:bg-slate-700/50 hover:text-white"
+        }`}
     >
       {children}
     </Link>
@@ -61,9 +60,8 @@ const NavDropdown = ({ item, closeMobileMenu }) => {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-          isActive ? "bg-slate-700 text-white" : "text-slate-300 hover:bg-slate-700/50 hover:text-white"
-        }`}
+        className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? "bg-slate-700 text-white" : "text-slate-300 hover:bg-slate-700/50 hover:text-white"
+          }`}
       >
         <div className="flex items-center gap-3">
           <item.icon className="w-5 h-5" />
@@ -78,11 +76,10 @@ const NavDropdown = ({ item, closeMobileMenu }) => {
               key={subItem.name}
               to={subItem.href}
               onClick={() => handleNavigate(subItem.href)}
-              className={`flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                location.pathname === subItem.href
+              className={`flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm font-medium transition-colors ${location.pathname === subItem.href
                   ? "text-white"
                   : "text-slate-400 hover:bg-slate-700/50 hover:text-white"
-              }`}
+                }`}
             >
               <subItem.icon className="w-4 h-4" />
               <span>{subItem.name}</span>
@@ -127,6 +124,7 @@ const Navbar = () => {
         { name: "Reporte de compras", href: "/reportes/compras", icon: TrendingUp },
         { name: "Reporte de ventas", href: "/reportes/ventas", icon: FileText },
         { name: "Reporte de presupuestos", href: "/reportes/presupuestos", icon: Calculator },
+        { name: "Reporte de cotizaciones", href: "/reportes/cotizacion", icon: FileText },
       ],
     },
     {
@@ -214,9 +212,8 @@ const DesktopDropdown = ({ item }) => {
     <div className="relative">
       <HeadlessMenu as="div" className="relative">
         <HeadlessMenu.Button
-          className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-            isActive ? "bg-slate-700 text-white" : "text-slate-300 hover:bg-slate-700/50 hover:text-white"
-          }`}
+          className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? "bg-slate-700 text-white" : "text-slate-300 hover:bg-slate-700/50 hover:text-white"
+            }`}
         >
           <item.icon className="w-4 h-4" />
           <span>{item.name}</span>
@@ -238,9 +235,8 @@ const DesktopDropdown = ({ item }) => {
                   {({ active }) => (
                     <Link
                       to={subItem.href}
-                      className={`${
-                        active ? "bg-slate-100 text-slate-900" : "text-slate-700"
-                      } group flex items-center gap-3 px-4 py-2 text-sm`}
+                      className={`${active ? "bg-slate-100 text-slate-900" : "text-slate-700"
+                        } group flex items-center gap-3 px-4 py-2 text-sm`}
                     >
                       <subItem.icon className="w-4 h-4" />
                       {subItem.name}
@@ -292,9 +288,8 @@ const UserDropdown = ({ user, onLogout }) => (
               {({ active }) => (
                 <button
                   onClick={onLogout}
-                  className={`${
-                    active ? "bg-slate-100 text-slate-900" : "text-slate-700"
-                  } group flex w-full items-center gap-3 rounded-md px-4 py-2 text-sm`}
+                  className={`${active ? "bg-slate-100 text-slate-900" : "text-slate-700"
+                    } group flex w-full items-center gap-3 rounded-md px-4 py-2 text-sm`}
                 >
                   <LogOut className="w-4 h-4 text-red-500" />
                   Cerrar Sesión

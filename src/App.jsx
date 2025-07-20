@@ -22,6 +22,7 @@ import CierreCaja from "./pages/CierreCaja"
 import MovimientosTable from "./components/cuenta-corriente/MovimientosTable"
 import StockMovementsHistory from "./pages/StockMovementsHistory"
 import Cotizaciones from "./pages/Cotizaciones" // NUEVO: Importar página de cotizaciones
+import HistorialCotizaciones from "./pages/HistorialCotizaciones"
 
 function AppRoutes() {
   const { isAuthenticated, loading } = useAuth()
@@ -105,6 +106,14 @@ function AppRoutes() {
       />
       <Route
         path="/reportes/presupuestos"
+        element={
+          <ProtectedRoute adminOnly>
+            <ReportePresupuestos />
+          </ProtectedRoute>
+        }
+      />
+        <Route
+        path="/reportes/cotizacion"
         element={
           <ProtectedRoute adminOnly>
             <ReportePresupuestos />

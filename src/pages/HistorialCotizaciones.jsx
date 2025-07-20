@@ -24,14 +24,12 @@ import {
   History,
   Clock,
   XCircle,
-  ArrowRight,
   Edit,
   Ban,
 } from "lucide-react"
 import CotizacionDetailsModal from "../components/cotizaciones/CotizacionDetailsModal"
 import UpdateCotizacionStatusModal from "../components/cotizaciones/UpdateCotizacionStatusModal"
 import CancelCotizacionModal from "../components/cotizaciones/CancelCotizacionModal"
-import ConvertToPresupuestoModal from "../components/cotizaciones/ConvertToPresupuestoModal"
 import { useCotizaciones } from "../hooks/useCotizaciones"
 import { formatCurrency } from "../lib/utils"
 import { extractExactDateTime } from "../lib/date-utils"
@@ -48,7 +46,6 @@ const HistorialCotizaciones = () => {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
-  const [isConvertModalOpen, setIsConvertModalOpen] = useState(false)
   const [showFilterCard, setShowFilterCard] = useState(false)
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
 
@@ -61,9 +58,8 @@ const HistorialCotizaciones = () => {
     getCotizacionById,
     updateCotizacionStatus,
     cancelCotizacion,
-    convertToPresupuesto,
     updateFilters,
-    formatCurrency: formatCurrencyService,
+  
     formatDate,
   } = useCotizaciones()
 
@@ -149,14 +145,6 @@ const HistorialCotizaciones = () => {
     if (result.success) {
       setSelectedCotizacion(result.data)
       setIsCancelModalOpen(true)
-    }
-  }
-
-  const handleConvertToPresupuesto = async (cotizacionId) => {
-    const result = await getCotizacionById(cotizacionId)
-    if (result.success) {
-      setSelectedCotizacion(result.data)
-      setIsConvertModalOpen(true)
     }
   }
 
@@ -248,17 +236,12 @@ const HistorialCotizaciones = () => {
 
   // Función para verificar si se puede cambiar el estado
   const canUpdateStatus = (cotizacion) => {
-    return cotizacion.estado !== "anulada" && cotizacion.estado !== "aceptada"
+    return cotizacion.estado !== "anulada"
   }
 
   // Función para verificar si se puede cancelar
   const canCancel = (cotizacion) => {
     return cotizacion.estado !== "anulada"
-  }
-
-  // Función para verificar si se puede convertir a presupuesto
-  const canConvertToPresupuesto = (cotizacion) => {
-    return cotizacion.estado === "aceptada"
   }
 
   if (loading && cotizaciones.length === 0) {
@@ -621,18 +604,6 @@ const HistorialCotizaciones = () => {
                                     </Button>
                                   )}
 
-                                  {canConvertToPresupuesto(cotizacion) && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleConvertToPresupuesto(cotizacion.id)}
-                                      className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
-                                      title="Convertir a presupuesto"
-                                    >
-                                      <ArrowRight className="w-4 h-4" />
-                                    </Button>
-                                  )}
-
                                   {canCancel(cotizacion) && (
                                     <Button
                                       size="sm"
@@ -684,13 +655,6 @@ const HistorialCotizaciones = () => {
             onClose={() => setIsCancelModalOpen(false)}
             cotizacion={selectedCotizacion}
             onCancel={cancelCotizacion}
-          />
-
-          <ConvertToPresupuestoModal
-            isOpen={isConvertModalOpen}
-            onClose={() => setIsConvertModalOpen(false)}
-            cotizacion={selectedCotizacion}
-            onConvert={convertToPresupuesto}
           />
         </div>
       </div>

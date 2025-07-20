@@ -116,7 +116,7 @@ function AppRoutes() {
         path="/reportes/cotizacion"
         element={
           <ProtectedRoute adminOnly>
-            <ReportePresupuestos />
+            <HistorialCotizaciones />
           </ProtectedRoute>
         }
       />

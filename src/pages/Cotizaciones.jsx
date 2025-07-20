@@ -276,22 +276,6 @@ const Cotizaciones = () => {
   return (
     <Layout>
       <div className="max-w-[95rem] mx-auto px-4 py-6 min-h-screen">
-        {/* Header */}
-        <div className="mb-8">
-
-          {/* Indicador de estado cuando hay productos */}
-          {cartProducts.length > 0 && (
-            <div className="mt-4 p-3 rounded-lg border-l-4 bg-purple-50 border-purple-400 text-purple-800">
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 rounded-full bg-purple-400"></div>
-                <span className="text-sm font-medium">Cotización en progreso</span>
-                <span className="text-xs opacity-75">
-                  • {cartProducts.length} producto{cartProducts.length !== 1 ? "s" : ""} en carrito
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Columna Principal */}

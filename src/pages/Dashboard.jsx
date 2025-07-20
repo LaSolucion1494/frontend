@@ -314,9 +314,6 @@ const Dashboard = () => {
                 <Search className="w-5 h-5" />
                 Búsqueda Rápida de Productos
               </CardTitle>
-              <CardDescription className="text-slate-200">
-                Busca productos de forma instantánea mientras escribes
-              </CardDescription>
             </CardHeader>
             <CardContent className="p-6">
               <div className="space-y-6">

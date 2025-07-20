@@ -23,6 +23,7 @@ import {
   Truck,
   LayoutGrid,
   Calculator,
+  ClipboardList,
 } from "lucide-react"
 import { Dialog, Transition, Menu as HeadlessMenu } from "@headlessui/react"
 
@@ -112,6 +113,7 @@ const Navbar = () => {
   // Definición de los items de navegación
   const baseNavigationItems = [
     { name: "Ventas", href: "/ventas", icon: ShoppingCart },
+    { name: "Cotizaciones", href: "/cotizaciones", icon: ClipboardList }, // NUEVO: Agregar cotizaciones
     { name: "Compras", href: "/compras", icon: Package },
     { name: "Cierre de caja", href: "/cierre-caja", icon: CreditCard },
   ]

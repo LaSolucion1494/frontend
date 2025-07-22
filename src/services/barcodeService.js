@@ -93,11 +93,11 @@ export const barcodeService = {
       // Configuración optimizada para impresión térmica
       const defaultOptions = {
         format: "CODE128",
-        width: options.width || 2,
-        height: options.height || 60,
+        width: options.width || 3, // Ancho de barras aumentado por defecto
+        height: options.height || 80, // Altura aumentada por defecto
         displayValue: options.displayValue !== false,
-        fontSize: options.fontSize || 12,
-        textMargin: options.textMargin || 2,
+        fontSize: options.fontSize || 18, // Tamaño de fuente aumentado por defecto
+        textMargin: options.textMargin || 5,
         margin: options.margin || 5,
         background: options.background || "#ffffff",
         lineColor: options.lineColor || "#000000",
@@ -123,11 +123,11 @@ export const barcodeService = {
     try {
       const thermalOptions = {
         format: "CODE128",
-        width: 1.5, // Ancho optimizado para papel térmico
-        height: 45, // Altura optimizada para papel 44mm
+        width: 3, // Ancho aumentado para mejor visibilidad
+        height: 80, // Altura aumentada para mejor visibilidad
         displayValue: true,
-        fontSize: 10,
-        textMargin: 2,
+        fontSize: 18, // Tamaño de fuente aumentado
+        textMargin: 5, // Mayor espacio para el texto
         margin: 2,
         background: "#ffffff",
         lineColor: "#000000",
@@ -160,7 +160,7 @@ export const barcodeService = {
     return patterns.some((pattern) => pattern.test(code))
   },
 
-  // Crear PDF optimizado para impresión térmica
+  // Crear PDF optimizado para impresión térmica - Solo código de barras grande
   generateThermalPrintablePDF: async (products) => {
     const { jsPDF } = await import("jspdf")
 
@@ -176,55 +176,39 @@ export const barcodeService = {
         doc.addPage()
       }
 
-      // Generar código de barras optimizado para térmica
+      // Generar código de barras optimizado para térmica - MÁS GRANDE
       const barcodeImage = barcodeService.generateThermalBarcodeImage(product.codigo, {
-        width: 1.5,
-        height: 20,
-        fontSize: 8,
-        margin: 1,
+        width: 3,
+        height: 30,
+        fontSize: 18,
+        margin: 2,
       })
 
       if (barcodeImage) {
         // Centrar el código de barras
-        const barcodeWidth = 45
-        const barcodeHeight = 12
+        const barcodeWidth = 50
+        const barcodeHeight = 30
         const x = (55 - barcodeWidth) / 2
-        const y = 8
+        const y = 7
 
         // Agregar código de barras
         doc.addImage(barcodeImage, "PNG", x, y, barcodeWidth, barcodeHeight)
 
-        // Agregar nombre del producto (máximo 25 caracteres)
-        doc.setFontSize(8)
-        doc.setFont("helvetica", "bold")
-        const productName = product.nombre.substring(0, 25).toUpperCase()
-        const textWidth = doc.getTextWidth(productName)
-        const textX = (55 - textWidth) / 2
-        doc.text(productName, textX, y + barcodeHeight + 5)
+        // Ya no agregamos el nombre del producto
 
-        // Agregar código del producto
-        doc.setFontSize(6)
-        doc.setFont("courier", "normal")
+        // Agregar código del producto con fuente más grande
+        doc.setFontSize(12)
+        doc.setFont("courier", "bold")
         const codeWidth = doc.getTextWidth(product.codigo)
         const codeX = (55 - codeWidth) / 2
-        doc.text(product.codigo, codeX, y + barcodeHeight + 10)
-
-        // Agregar precio si está disponible
-        if (product.precio_venta) {
-          doc.setFontSize(7)
-          doc.setFont("helvetica", "bold")
-          const price = `$${product.precio_venta.toLocaleString("es-AR")}`
-          const priceWidth = doc.getTextWidth(price)
-          const priceX = (55 - priceWidth) / 2
-          doc.text(price, priceX, y + barcodeHeight + 15)
-        }
+        doc.text(product.codigo, codeX, y + barcodeHeight + 5)
       }
     })
 
     return doc
   },
 
-  // Crear PDF para impresión múltiple en hoja A4
+  // Crear PDF para impresión múltiple en hoja A4 - Solo código de barras grande
   generateMultipleLabelsPDF: async (products, labelsPerPage = 12) => {
     const { jsPDF } = await import("jspdf")
     const doc = new jsPDF()
@@ -250,33 +234,22 @@ export const barcodeService = {
       const x = margin + currentCol * labelWidth
       const y = margin + currentRow * labelHeight
 
-      // Generar código de barras
+      // Generar código de barras grande
       const barcodeImage = barcodeService.generateThermalBarcodeImage(product.codigo, {
-        width: 1.2,
-        height: 15,
-        fontSize: 6,
-        margin: 1,
+        width: 3,
+        height: 25,
+        fontSize: 14,
+        margin: 2,
       })
 
       if (barcodeImage) {
         // Agregar código de barras
-        doc.addImage(barcodeImage, "PNG", x + 5, y + 8, 45, 10)
+        doc.addImage(barcodeImage, "PNG", x + 2.5, y + 8, 50, 20)
 
-        // Agregar información del producto
-        doc.setFontSize(6)
-        doc.setFont("helvetica", "bold")
-        const productName = product.nombre.substring(0, 20).toUpperCase()
-        doc.text(productName, x + 5, y + 22)
-
-        doc.setFontSize(5)
-        doc.setFont("courier", "normal")
-        doc.text(product.codigo, x + 5, y + 26)
-
-        if (product.precio_venta) {
-          doc.setFontSize(6)
-          doc.setFont("helvetica", "bold")
-          doc.text(`$${product.precio_venta.toLocaleString("es-AR")}`, x + 5, y + 30)
-        }
+        // Agregar solo el código (no el nombre del producto)
+        doc.setFontSize(10)
+        doc.setFont("courier", "bold")
+        doc.text(product.codigo, x + 27.5, y + 35, { align: "center" })
 
         // Agregar borde para visualización
         doc.setDrawColor(200, 200, 200)

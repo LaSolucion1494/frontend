@@ -14,7 +14,7 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
     small: { width: 1, height: 40, fontSize: 10 },
     medium: { width: 2, height: 60, fontSize: 14 },
     large: { width: 2, height: 80, fontSize: 16 },
-    thermal: { width: 1.5, height: 50, fontSize: 12 }, // Optimizado para impresión térmica
+    thermal: { width: 2, height: 70, fontSize: 16 }, // Aumentado para impresión térmica
   }
 
   useEffect(() => {
@@ -51,13 +51,13 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
 
   const handlePrint = () => {
     if (barcodeImage) {
-      // Generar código de barras optimizado para impresión térmica
+      // Generar código de barras optimizado para impresión térmica - MÁS GRANDE
       const thermalBarcodeImage = barcodeService.generateBarcodeImage(code, {
-        width: 1.5,
-        height: 45,
-        fontSize: 10,
+        width: 3, // Ancho de barras aumentado
+        height: 80, // Altura aumentada
+        fontSize: 18, // Tamaño de fuente aumentado
         margin: 2,
-        textMargin: 2,
+        textMargin: 5, // Mayor espacio para el texto
         displayValue: true,
         background: "#ffffff",
         lineColor: "#000000",
@@ -67,7 +67,7 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
       printWindow.document.write(`
         <html>
           <head>
-            <title>Código de Barras - ${productName}</title>
+            <title>Código de Barras - ${code}</title>
             <style>
               * {
                 margin: 0;
@@ -77,8 +77,6 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
               
               body { 
                 font-family: 'Courier New', monospace;
-                font-size: 10px;
-                line-height: 1.2;
                 background: white;
               }
               
@@ -99,33 +97,27 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
               .barcode-container {
                 width: 100%;
                 max-width: 50mm;
-                margin-bottom: 1mm;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
               }
               
               .barcode-image {
                 width: 100%;
                 height: auto;
-                max-height: 25mm;
+                max-height: 35mm;
                 object-fit: contain;
               }
               
-              .product-name {
-                font-size: 8px;
-                font-weight: bold;
-                margin: 1mm 0;
-                max-width: 50mm;
-                word-wrap: break-word;
-                overflow-wrap: break-word;
-                hyphens: auto;
-                line-height: 1.1;
-                text-transform: uppercase;
-              }
+              /* Eliminado el nombre del producto */
               
               .product-code {
-                font-size: 7px;
+                font-size: 14px;
                 font-family: 'Courier New', monospace;
-                margin-top: 0.5mm;
-                letter-spacing: 0.5px;
+                font-weight: bold;
+                margin-top: 2mm;
+                letter-spacing: 1px;
               }
               
               .no-print { 
@@ -223,9 +215,8 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
             <div class="thermal-label">
               <div class="barcode-container">
                 <img src="${thermalBarcodeImage}" alt="Código de barras ${code}" class="barcode-image" />
+                <!-- Se eliminó el nombre del producto -->
               </div>
-              <div class="product-name">${productName.substring(0, 25)}</div>
-              <div class="product-code">${code}</div>
             </div>
             
             <div class="no-print">

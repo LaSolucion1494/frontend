@@ -11,9 +11,10 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
   const [barcodeImage, setBarcodeImage] = useState(null)
 
   const sizeConfig = {
-    small: { width: 1, height: 60, fontSize: 12 },
-    medium: { width: 2, height: 80, fontSize: 16 },
-    large: { width: 3, height: 100, fontSize: 20 },
+    small: { width: 1, height: 40, fontSize: 10 },
+    medium: { width: 2, height: 60, fontSize: 14 },
+    large: { width: 2, height: 80, fontSize: 16 },
+    thermal: { width: 1.5, height: 50, fontSize: 12 }, // Optimizado para impresión térmica
   }
 
   useEffect(() => {
@@ -50,51 +51,200 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
 
   const handlePrint = () => {
     if (barcodeImage) {
+      // Generar código de barras optimizado para impresión térmica
+      const thermalBarcodeImage = barcodeService.generateBarcodeImage(code, {
+        width: 1.5,
+        height: 45,
+        fontSize: 10,
+        margin: 2,
+        textMargin: 2,
+        displayValue: true,
+        background: "#ffffff",
+        lineColor: "#000000",
+      })
+
       const printWindow = window.open("", "_blank")
       printWindow.document.write(`
         <html>
           <head>
             <title>Código de Barras - ${productName}</title>
             <style>
+              * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+              }
+              
               body { 
-                margin: 0; 
-                padding: 20px; 
-                font-family: Arial, sans-serif;
+                font-family: 'Courier New', monospace;
+                font-size: 10px;
+                line-height: 1.2;
+                background: white;
+              }
+              
+              .thermal-label {
+                width: 55mm;
+                height: 44mm;
+                padding: 2mm;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
                 text-align: center;
+                border: none;
+                background: white;
+                page-break-after: always;
               }
+              
               .barcode-container {
-                display: inline-block;
-                border: 1px solid #ccc;
-                padding: 20px;
-                margin: 10px;
+                width: 100%;
+                max-width: 50mm;
+                margin-bottom: 1mm;
               }
-              .product-info {
-                margin-top: 10px;
-                font-size: 14px;
+              
+              .barcode-image {
+                width: 100%;
+                height: auto;
+                max-height: 25mm;
+                object-fit: contain;
               }
+              
+              .product-name {
+                font-size: 8px;
+                font-weight: bold;
+                margin: 1mm 0;
+                max-width: 50mm;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+                hyphens: auto;
+                line-height: 1.1;
+                text-transform: uppercase;
+              }
+              
+              .product-code {
+                font-size: 7px;
+                font-family: 'Courier New', monospace;
+                margin-top: 0.5mm;
+                letter-spacing: 0.5px;
+              }
+              
+              .no-print { 
+                display: none; 
+              }
+              
+              @page {
+                size: 55mm 44mm;
+                margin: 0;
+                padding: 0;
+              }
+              
               @media print {
-                body { margin: 0; padding: 10px; }
-                .no-print { display: none; }
+                body {
+                  margin: 0;
+                  padding: 0;
+                  background: white !important;
+                  -webkit-print-color-adjust: exact;
+                  color-adjust: exact;
+                }
+                
+                .thermal-label {
+                  width: 55mm;
+                  height: 44mm;
+                  padding: 2mm;
+                  margin: 0;
+                  border: none;
+                  box-shadow: none;
+                  background: white !important;
+                }
+                
+                .no-print { 
+                  display: none !important; 
+                }
+                
+                .barcode-image {
+                  -webkit-print-color-adjust: exact;
+                  color-adjust: exact;
+                }
+              }
+              
+              /* Estilos para vista previa */
+              @media screen {
+                body {
+                  padding: 10mm;
+                  background: #f0f0f0;
+                }
+                
+                .thermal-label {
+                  border: 1px dashed #ccc;
+                  background: white;
+                  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                  margin-bottom: 10mm;
+                }
+                
+                .no-print {
+                  display: block;
+                  margin-top: 10mm;
+                  text-align: center;
+                }
+                
+                .print-button {
+                  background: #007bff;
+                  color: white;
+                  border: none;
+                  padding: 8px 16px;
+                  margin: 0 5px;
+                  border-radius: 4px;
+                  cursor: pointer;
+                  font-size: 12px;
+                }
+                
+                .print-button:hover {
+                  background: #0056b3;
+                }
+                
+                .close-button {
+                  background: #6c757d;
+                  color: white;
+                  border: none;
+                  padding: 8px 16px;
+                  margin: 0 5px;
+                  border-radius: 4px;
+                  cursor: pointer;
+                  font-size: 12px;
+                }
+                
+                .close-button:hover {
+                  background: #545b62;
+                }
               }
             </style>
           </head>
           <body>
-            <div class="barcode-container">
-              <img src="${barcodeImage}" alt="Código de barras ${code}" />
-              <div class="product-info">
-                <strong>${productName}</strong><br>
-                Código: ${code}
+            <div class="thermal-label">
+              <div class="barcode-container">
+                <img src="${thermalBarcodeImage}" alt="Código de barras ${code}" class="barcode-image" />
               </div>
+              <div class="product-name">${productName.substring(0, 25)}</div>
+              <div class="product-code">${code}</div>
             </div>
-            <div class="no-print" style="margin-top: 20px;">
-              <button onclick="window.print()">Imprimir</button>
-              <button onclick="window.close()">Cerrar</button>
+            
+            <div class="no-print">
+              <button onclick="window.print()" class="print-button">🖨️ Imprimir</button>
+              <button onclick="window.close()" class="close-button">❌ Cerrar</button>
+              <div style="margin-top: 10px; font-size: 11px; color: #666;">
+                Tamaño: 55mm x 44mm | Impresora Térmica
+              </div>
             </div>
           </body>
         </html>
       `)
       printWindow.document.close()
       printWindow.focus()
+
+      // Auto-imprimir después de un breve delay para asegurar que la página se cargue
+      setTimeout(() => {
+        printWindow.print()
+      }, 500)
     }
   }
 
@@ -132,17 +282,22 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
 
           {showControls && (
             <div className="flex justify-center space-x-2 pt-2">
-              <Button size="sm" variant="outline" onClick={handleCopyCode} className="text-xs">
+              <Button size="sm" variant="outline" onClick={handleCopyCode} className="text-xs bg-transparent">
                 <Copy className="w-3 h-3 mr-1" />
                 Copiar
               </Button>
-              <Button size="sm" variant="outline" onClick={handleDownload} className="text-xs">
+              <Button size="sm" variant="outline" onClick={handleDownload} className="text-xs bg-transparent">
                 <Download className="w-3 h-3 mr-1" />
                 Descargar
               </Button>
-              <Button size="sm" variant="outline" onClick={handlePrint} className="text-xs">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handlePrint}
+                className="text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+              >
                 <Printer className="w-3 h-3 mr-1" />
-                Imprimir
+                Imprimir Térmico
               </Button>
             </div>
           )}

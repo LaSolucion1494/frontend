@@ -63,7 +63,9 @@ const BarcodeModal = ({ isOpen, onClose, product }) => {
             <p className="text-sm text-slate-300 mt-1">
               {product.nombre} - {product.codigo}
             </p>
-            <p className="text-xs text-slate-400 mt-1">Optimizado para papel térmico 55mm x 44mm</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Optimizado para papel térmico 55mm x 44mm - Texto grande y claro
+            </p>
           </div>
           <Button
             onClick={onClose}
@@ -137,7 +139,7 @@ const BarcodeModal = ({ isOpen, onClose, product }) => {
               </Button>
             </div>
             <p className="text-xs text-blue-600 mt-2">
-              💡 El PDF térmico está optimizado para impresoras térmicas de 55mm x 44mm
+              💡 El PDF térmico está optimizado para impresoras térmicas con texto grande y legible
             </p>
           </div>
         </div>

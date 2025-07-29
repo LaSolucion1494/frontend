@@ -14,7 +14,7 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
     small: { width: 1, height: 40, fontSize: 10 },
     medium: { width: 2, height: 60, fontSize: 14 },
     large: { width: 2, height: 80, fontSize: 16 },
-    thermal: { width: 2, height: 70, fontSize: 16 }, // Aumentado para impresión térmica
+    thermal: { width: 4, height: 60, fontSize: 24, textMargin: 8 }, // MEJORADO para térmica
   }
 
   useEffect(() => {
@@ -51,13 +51,13 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
 
   const handlePrint = () => {
     if (barcodeImage) {
-      // Generar código de barras optimizado para impresión térmica - MÁS GRANDE
+      // Generar código de barras optimizado para impresión térmica - MEJORADO
       const thermalBarcodeImage = barcodeService.generateBarcodeImage(code, {
-        width: 3, // Ancho de barras aumentado
-        height: 80, // Altura aumentada
-        fontSize: 18, // Tamaño de fuente aumentado
-        margin: 2,
-        textMargin: 5, // Mayor espacio para el texto
+        width: 4, // Aumentado de 3 a 4 para barras más gruesas
+        height: 60, // Reducido de 80 a 60 para dar más espacio al texto
+        fontSize: 26, // Aumentado de 18 a 26 para texto MÁS GRANDE
+        margin: 3,
+        textMargin: 10, // Aumentado de 5 a 10 para más espacio
         displayValue: true,
         background: "#ffffff",
         lineColor: "#000000",
@@ -65,170 +65,175 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
 
       const printWindow = window.open("", "_blank")
       printWindow.document.write(`
-        <html>
-          <head>
-            <title>Código de Barras - ${code}</title>
-            <style>
-              * {
+      <html>
+        <head>
+          <title>Código de Barras - ${code}</title>
+          <style>
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            
+            body { 
+              font-family: 'Courier New', monospace;
+              background: white;
+            }
+            
+            .thermal-label {
+              width: 55mm;
+              height: 44mm;
+              padding: 2mm;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              align-items: center;
+              text-align: center;
+              border: none;
+              background: white;
+              page-break-after: always;
+            }
+            
+            .barcode-container {
+              width: 100%;
+              max-width: 50mm;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+            }
+            
+            .barcode-image {
+              width: 100%;
+              height: auto;
+              max-height: 30mm; /* Reducido de 35mm a 30mm para dar más espacio al texto */
+              object-fit: contain;
+            }
+            
+            .product-code {
+              font-size: 18px; /* Aumentado de 14px a 18px */
+              font-family: 'Courier New', monospace;
+              font-weight: bold;
+              margin-top: 3mm; /* Aumentado de 2mm a 3mm */
+              letter-spacing: 1.5px; /* Aumentado de 1px a 1.5px */
+              line-height: 1.2;
+            }
+            
+            .no-print { 
+              display: none; 
+            }
+            
+            @page {
+              size: 55mm 44mm;
+              margin: 0;
+              padding: 0;
+            }
+            
+            @media print {
+              body {
                 margin: 0;
                 padding: 0;
-                box-sizing: border-box;
-              }
-              
-              body { 
-                font-family: 'Courier New', monospace;
-                background: white;
+                background: white !important;
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
               }
               
               .thermal-label {
                 width: 55mm;
                 height: 44mm;
                 padding: 2mm;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                text-align: center;
+                margin: 0;
                 border: none;
-                background: white;
-                page-break-after: always;
+                box-shadow: none;
+                background: white !important;
               }
-              
-              .barcode-container {
-                width: 100%;
-                max-width: 50mm;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-              }
-              
-              .barcode-image {
-                width: 100%;
-                height: auto;
-                max-height: 35mm;
-                object-fit: contain;
-              }
-              
-              /* Eliminado el nombre del producto */
               
               .product-code {
-                font-size: 14px;
-                font-family: 'Courier New', monospace;
-                font-weight: bold;
-                margin-top: 2mm;
-                letter-spacing: 1px;
+                font-size: 18px !important; /* Forzar tamaño en impresión */
+                font-weight: bold !important;
+                letter-spacing: 1.5px !important;
               }
               
               .no-print { 
-                display: none; 
+                display: none !important; 
               }
               
-              @page {
-                size: 55mm 44mm;
-                margin: 0;
-                padding: 0;
+              .barcode-image {
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
               }
-              
-              @media print {
-                body {
-                  margin: 0;
-                  padding: 0;
-                  background: white !important;
-                  -webkit-print-color-adjust: exact;
-                  color-adjust: exact;
-                }
-                
-                .thermal-label {
-                  width: 55mm;
-                  height: 44mm;
-                  padding: 2mm;
-                  margin: 0;
-                  border: none;
-                  box-shadow: none;
-                  background: white !important;
-                }
-                
-                .no-print { 
-                  display: none !important; 
-                }
-                
-                .barcode-image {
-                  -webkit-print-color-adjust: exact;
-                  color-adjust: exact;
-                }
-              }
-              
-              /* Estilos para vista previa */
-              @media screen {
-                body {
-                  padding: 10mm;
-                  background: #f0f0f0;
-                }
-                
-                .thermal-label {
-                  border: 1px dashed #ccc;
-                  background: white;
-                  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                  margin-bottom: 10mm;
-                }
-                
-                .no-print {
-                  display: block;
-                  margin-top: 10mm;
-                  text-align: center;
-                }
-                
-                .print-button {
-                  background: #007bff;
-                  color: white;
-                  border: none;
-                  padding: 8px 16px;
-                  margin: 0 5px;
-                  border-radius: 4px;
-                  cursor: pointer;
-                  font-size: 12px;
-                }
-                
-                .print-button:hover {
-                  background: #0056b3;
-                }
-                
-                .close-button {
-                  background: #6c757d;
-                  color: white;
-                  border: none;
-                  padding: 8px 16px;
-                  margin: 0 5px;
-                  border-radius: 4px;
-                  cursor: pointer;
-                  font-size: 12px;
-                }
-                
-                .close-button:hover {
-                  background: #545b62;
-                }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="thermal-label">
-              <div class="barcode-container">
-                <img src="${thermalBarcodeImage}" alt="Código de barras ${code}" class="barcode-image" />
-                <!-- Se eliminó el nombre del producto -->
-              </div>
-            </div>
+            }
             
-            <div class="no-print">
-              <button onclick="window.print()" class="print-button">🖨️ Imprimir</button>
-              <button onclick="window.close()" class="close-button">❌ Cerrar</button>
-              <div style="margin-top: 10px; font-size: 11px; color: #666;">
-                Tamaño: 55mm x 44mm | Impresora Térmica
-              </div>
+            /* Estilos para vista previa */
+            @media screen {
+              body {
+                padding: 10mm;
+                background: #f0f0f0;
+              }
+              
+              .thermal-label {
+                border: 1px dashed #ccc;
+                background: white;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                margin-bottom: 10mm;
+              }
+              
+              .no-print {
+                display: block;
+                margin-top: 10mm;
+                text-align: center;
+              }
+              
+              .print-button {
+                background: #007bff;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                margin: 0 5px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+              }
+              
+              .print-button:hover {
+                background: #0056b3;
+              }
+              
+              .close-button {
+                background: #6c757d;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                margin: 0 5px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+              }
+              
+              .close-button:hover {
+                background: #545b62;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="thermal-label">
+            <div class="barcode-container">
+              <img src="${thermalBarcodeImage}" alt="Código de barras ${code}" class="barcode-image" />
+              <div class="product-code">${code}</div>
             </div>
-          </body>
-        </html>
-      `)
+          </div>
+          
+          <div class="no-print">
+            <button onclick="window.print()" class="print-button">🖨️ Imprimir</button>
+            <button onclick="window.close()" class="close-button">❌ Cerrar</button>
+            <div style="margin-top: 10px; font-size: 11px; color: #666;">
+              Tamaño: 55mm x 44mm | Impresora Térmica | Texto Optimizado
+            </div>
+          </div>
+        </body>
+      </html>
+    `)
       printWindow.document.close()
       printWindow.focus()
 

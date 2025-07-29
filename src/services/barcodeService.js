@@ -123,12 +123,12 @@ export const barcodeService = {
     try {
       const thermalOptions = {
         format: "CODE128",
-        width: 3, // Ancho aumentado para mejor visibilidad
-        height: 80, // Altura aumentada para mejor visibilidad
+        width: 4, // Aumentado de 3 a 4 para barras más gruesas
+        height: 60, // Reducido de 80 a 60 para dar más espacio al texto
         displayValue: true,
-        fontSize: 18, // Tamaño de fuente aumentado
-        textMargin: 5, // Mayor espacio para el texto
-        margin: 2,
+        fontSize: 24, // Aumentado de 18 a 24 para texto más grande
+        textMargin: 8, // Aumentado de 5 a 8 para más espacio
+        margin: 3, // Aumentado ligeramente
         background: "#ffffff",
         lineColor: "#000000",
         textAlign: "center",
@@ -176,32 +176,31 @@ export const barcodeService = {
         doc.addPage()
       }
 
-      // Generar código de barras optimizado para térmica - MÁS GRANDE
+      // Generar código de barras optimizado para térmica - MEJORADO
       const barcodeImage = barcodeService.generateThermalBarcodeImage(product.codigo, {
-        width: 3,
-        height: 30,
-        fontSize: 18,
+        width: 4, // Barras más gruesas
+        height: 25, // Altura reducida para dar más espacio al texto
+        fontSize: 24, // Texto más grande
         margin: 2,
+        textMargin: 8, // Más espacio para el texto
       })
 
       if (barcodeImage) {
         // Centrar el código de barras
         const barcodeWidth = 50
-        const barcodeHeight = 30
+        const barcodeHeight = 25 // Reducido para dar más espacio al texto
         const x = (55 - barcodeWidth) / 2
-        const y = 7
+        const y = 5 // Movido más arriba
 
         // Agregar código de barras
         doc.addImage(barcodeImage, "PNG", x, y, barcodeWidth, barcodeHeight)
 
-        // Ya no agregamos el nombre del producto
-
-        // Agregar código del producto con fuente más grande
-        doc.setFontSize(12)
+        // Agregar código del producto con fuente MÁS GRANDE
+        doc.setFontSize(16) // Aumentado de 12 a 16
         doc.setFont("courier", "bold")
         const codeWidth = doc.getTextWidth(product.codigo)
         const codeX = (55 - codeWidth) / 2
-        doc.text(product.codigo, codeX, y + barcodeHeight + 5)
+        doc.text(product.codigo, codeX, y + barcodeHeight + 8) // Más espacio entre barcode y texto
       }
     })
 
@@ -234,22 +233,23 @@ export const barcodeService = {
       const x = margin + currentCol * labelWidth
       const y = margin + currentRow * labelHeight
 
-      // Generar código de barras grande
+      // Generar código de barras MEJORADO
       const barcodeImage = barcodeService.generateThermalBarcodeImage(product.codigo, {
-        width: 3,
-        height: 25,
-        fontSize: 14,
+        width: 4, // Barras más gruesas
+        height: 20, // Altura reducida
+        fontSize: 20, // Texto más grande
         margin: 2,
+        textMargin: 6,
       })
 
       if (barcodeImage) {
         // Agregar código de barras
-        doc.addImage(barcodeImage, "PNG", x + 2.5, y + 8, 50, 20)
+        doc.addImage(barcodeImage, "PNG", x + 2.5, y + 6, 50, 18)
 
-        // Agregar solo el código (no el nombre del producto)
-        doc.setFontSize(10)
+        // Agregar código con fuente MÁS GRANDE
+        doc.setFontSize(14) // Aumentado de 10 a 14
         doc.setFont("courier", "bold")
-        doc.text(product.codigo, x + 27.5, y + 35, { align: "center" })
+        doc.text(product.codigo, x + 27.5, y + 32, { align: "center" })
 
         // Agregar borde para visualización
         doc.setDrawColor(200, 200, 200)

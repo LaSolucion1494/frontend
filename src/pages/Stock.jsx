@@ -64,7 +64,7 @@ const Stock = () => {
 
   // Estados locales para filtros y UI
   const [searchByCode, setSearchByCode] = useState("")
-  const [searchByNameBrand, setSearchByNameBrand] = useState("")
+  const [searchByNameDescription, setSearchByNameDescription] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("Todos")
   const [selectedStockStatus, setSelectedStockStatus] = useState("todos")
   const [priceRange, setPriceRange] = useState({ min: "", max: "" })
@@ -90,11 +90,11 @@ const Stock = () => {
 
   // Refs para los inputs de búsqueda
   const searchCodeInputRef = useRef(null)
-  const searchNameBrandInputRef = useRef(null)
+  const searchNameDescriptionInputRef = useRef(null)
 
   // Refs para debounce - SIN ESTADOS DE LOADING QUE CAUSEN RE-RENDERS
   const codeSearchTimeoutRef = useRef(null)
-  const nameSearchTimeoutRef = useRef(null)
+  const nameDescriptionSearchTimeoutRef = useRef(null)
 
   // Hooks personalizados
   const {
@@ -187,7 +187,7 @@ const Stock = () => {
     [searchProducts, selectedCategory, selectedStockStatus, appliedPriceRange, pagination.itemsPerPage, updateFilters],
   )
 
-  const handleNameSearch = useCallback(
+  const handleNameDescriptionSearch = useCallback(
     async (searchTerm) => {
       if (!searchTerm.trim()) {
         setSearchResults([])
@@ -206,7 +206,7 @@ const Stock = () => {
       }
 
       try {
-        console.log("Buscando por nombre en stock:", searchTerm)
+        console.log("Buscando por nombre/descripción en stock:", searchTerm)
         setIsSearchActive(true)
 
         const searchResult = await searchProducts(searchTerm.trim(), {
@@ -214,19 +214,17 @@ const Stock = () => {
           offset: 0,
         })
 
-        console.log("Resultado búsqueda nombre en stock:", searchResult)
+        console.log("Resultado búsqueda nombre/descripción en stock:", searchResult)
 
         if (searchResult.success) {
-          // Filtrar productos que coincidan en nombre, descripción o marca
-          const nameMatches = searchResult.data
+          // Filtrar productos que coincidan en nombre o descripción
+          const nameDescriptionMatches = searchResult.data
             .filter((product) => {
               const term = searchTerm.toLowerCase()
               const matchesName = product.nombre.toLowerCase().includes(term)
               const matchesDescription = product.descripcion && product.descripcion.toLowerCase().includes(term)
-              const matchesBrand = product.marca && product.marca.toLowerCase().includes(term)
-              const matchesCode = product.codigo.toLowerCase().includes(term)
 
-              return matchesName || matchesDescription || matchesBrand || matchesCode
+              return matchesName || matchesDescription
             })
             .sort((a, b) => {
               const term = searchTerm.toLowerCase()
@@ -247,14 +245,14 @@ const Stock = () => {
               return a.nombre.localeCompare(b.nombre)
             })
 
-          console.log("Coincidencias de nombre encontradas en stock:", nameMatches.length)
-          setSearchResults(nameMatches)
+          console.log("Coincidencias de nombre/descripción encontradas en stock:", nameDescriptionMatches.length)
+          setSearchResults(nameDescriptionMatches)
         } else {
-          console.error("Error en búsqueda por nombre en stock:", searchResult.message)
+          console.error("Error en búsqueda por nombre/descripción en stock:", searchResult.message)
           setSearchResults([])
         }
       } catch (error) {
-        console.error("Error en búsqueda por nombre en stock:", error)
+        console.error("Error en búsqueda por nombre/descripción en stock:", error)
         setSearchResults([])
       }
     },
@@ -276,7 +274,7 @@ const Stock = () => {
       setSearchResults([])
       setIsSearchActive(false)
       // Si no hay búsqueda por código, usar filtros normales
-      if (!searchByNameBrand.trim()) {
+      if (!searchByNameDescription.trim()) {
         const filters = {
           search: "",
           categoria: selectedCategory !== "Todos" ? selectedCategory : "",
@@ -295,17 +293,17 @@ const Stock = () => {
         clearTimeout(codeSearchTimeoutRef.current)
       }
     }
-  }, [searchByCode])
+  }, [searchByCode, searchByNameDescription, selectedCategory, selectedStockStatus, appliedPriceRange, updateFilters])
 
   useEffect(() => {
     // Limpiar timeout anterior
-    if (nameSearchTimeoutRef.current) {
-      clearTimeout(nameSearchTimeoutRef.current)
+    if (nameDescriptionSearchTimeoutRef.current) {
+      clearTimeout(nameDescriptionSearchTimeoutRef.current)
     }
 
-    if (searchByNameBrand.trim()) {
-      nameSearchTimeoutRef.current = setTimeout(async () => {
-        await handleNameSearch(searchByNameBrand)
+    if (searchByNameDescription.trim()) {
+      nameDescriptionSearchTimeoutRef.current = setTimeout(async () => {
+        await handleNameDescriptionSearch(searchByNameDescription)
       }, 300)
     } else {
       setSearchResults([])
@@ -326,11 +324,11 @@ const Stock = () => {
 
     // Cleanup
     return () => {
-      if (nameSearchTimeoutRef.current) {
-        clearTimeout(nameSearchTimeoutRef.current)
+      if (nameDescriptionSearchTimeoutRef.current) {
+        clearTimeout(nameDescriptionSearchTimeoutRef.current)
       }
     }
-  }, [searchByNameBrand])
+  }, [searchByNameDescription])
 
   // Limpiar timeouts al desmontar el componente
   useEffect(() => {
@@ -338,8 +336,8 @@ const Stock = () => {
       if (codeSearchTimeoutRef.current) {
         clearTimeout(codeSearchTimeoutRef.current)
       }
-      if (nameSearchTimeoutRef.current) {
-        clearTimeout(nameSearchTimeoutRef.current)
+      if (nameDescriptionSearchTimeoutRef.current) {
+        clearTimeout(nameDescriptionSearchTimeoutRef.current)
       }
     }
   }, [])
@@ -347,12 +345,12 @@ const Stock = () => {
   // DETERMINAR QUÉ PRODUCTOS MOSTRAR - OPTIMIZADO
   const displayProducts = useMemo(() => {
     // Si hay búsquedas activas, mostrar resultados de búsqueda
-    if ((searchByCode.trim() || searchByNameBrand.trim()) && isSearchActive) {
+    if ((searchByCode.trim() || searchByNameDescription.trim()) && isSearchActive) {
       return searchResults
     }
     // Si no hay búsquedas, mostrar productos normales
     return products
-  }, [searchByCode, searchByNameBrand, searchResults, products, isSearchActive])
+  }, [searchByCode, searchByNameDescription, searchResults, products, isSearchActive])
 
   // Preparar categorías para el select
   const categoryOptions = useMemo(() => {
@@ -363,7 +361,7 @@ const Stock = () => {
   // EFECTO PARA FILTROS NO-BÚSQUEDA (categoría, stock, precio)
   useEffect(() => {
     // Solo aplicar filtros automáticos si no hay búsquedas activas
-    if (!searchByCode.trim() && !searchByNameBrand.trim()) {
+    if (!searchByCode.trim() && !searchByNameDescription.trim()) {
       const newFilters = {
         search: "",
         categoria: selectedCategory !== "Todos" ? selectedCategory : "",
@@ -374,7 +372,7 @@ const Stock = () => {
       }
       updateFilters(newFilters)
     }
-  }, [selectedCategory, selectedStockStatus, appliedPriceRange, searchByCode, searchByNameBrand, updateFilters])
+  }, [selectedCategory, selectedStockStatus, appliedPriceRange, searchByCode, searchByNameDescription, updateFilters])
 
   const handleAddProduct = () => {
     setSelectedProduct(null)
@@ -472,15 +470,15 @@ const Stock = () => {
     setSearchByCode(value)
 
     // Limpiar búsqueda por nombre si se está buscando por código
-    if (value.trim() && searchByNameBrand.trim()) {
-      setSearchByNameBrand("")
+    if (value.trim() && searchByNameDescription.trim()) {
+      setSearchByNameDescription("")
     }
   }
 
   // Función para búsqueda por nombre/marca - MEJORADA
-  const handleNameBrandSearchChange = (e) => {
+  const handleNameDescriptionSearchChange = (e) => {
     const value = e.target.value
-    setSearchByNameBrand(value)
+    setSearchByNameDescription(value)
 
     // Limpiar búsqueda por código si se está buscando por nombre
     if (value.trim() && searchByCode.trim()) {
@@ -497,8 +495,8 @@ const Stock = () => {
   }
 
   // Función para limpiar búsqueda por nombre/marca - OPTIMIZADA
-  const clearNameBrandSearch = () => {
-    setSearchByNameBrand("")
+  const clearNameDescriptionSearch = () => {
+    setSearchByNameDescription("")
     setSearchResults([])
     setIsSearchActive(false)
     // NO CAMBIAR FOCO AQUÍ - mantener foco natural
@@ -507,7 +505,7 @@ const Stock = () => {
   // Función para limpiar todos los filtros - OPTIMIZADA
   const clearFilters = () => {
     setSearchByCode("")
-    setSearchByNameBrand("")
+    setSearchByNameDescription("")
     setSearchResults([])
     setIsSearchActive(false)
     setSelectedCategory("Todos")
@@ -520,7 +518,7 @@ const Stock = () => {
   const handleRefresh = () => {
     // Limpiar búsquedas y recargar
     setSearchByCode("")
-    setSearchByNameBrand("")
+    setSearchByNameDescription("")
     setSearchResults([])
     setIsSearchActive(false)
     fetchProducts({ offset: 0 })
@@ -660,8 +658,8 @@ const Stock = () => {
                   </Button>
                 </div>
                 <CardDescription>
-                  Busca productos por código (compatible con escáner) o por nombre/marca. La búsqueda es más rápida y
-                  eficiente.
+                  Busca productos por código (compatible con escáner) o por nombre/descripción. La búsqueda es más
+                  rápida y eficiente.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -697,28 +695,28 @@ const Stock = () => {
                       </div>
                     </div>
 
-                    {/* Input para búsqueda por nombre/marca - SIN LOADING INDICATORS */}
+                    {/* Input para búsqueda por nombre/descripción - SIN LOADING INDICATORS */}
                     <div className="space-y-2">
-                      <Label htmlFor="searchNameBrand">Buscar por nombre/marca</Label>
+                      <Label htmlFor="searchNameDescription">Buscar por nombre/descripción</Label>
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                         <Input
-                          ref={searchNameBrandInputRef}
-                          id="searchNameBrand"
-                          placeholder="Nombre, marca, descripción..."
-                          value={searchByNameBrand}
-                          onChange={handleNameBrandSearchChange}
+                          ref={searchNameDescriptionInputRef}
+                          id="searchNameDescription"
+                          placeholder="Nombre o descripción del producto..."
+                          value={searchByNameDescription}
+                          onChange={handleNameDescriptionSearchChange}
                           className="pl-10 pr-10 border-slate-800"
                           autoComplete="off"
                           disabled={isCurrentlyLoading}
                         />
-                        {searchByNameBrand && (
+                        {searchByNameDescription && (
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
-                            onClick={clearNameBrandSearch}
+                            onClick={clearNameDescriptionSearch}
                           >
                             <X className="w-3 h-3" />
                           </Button>
@@ -771,7 +769,7 @@ const Stock = () => {
                       Filtros avanzados
                     </Button>
                     {(searchByCode ||
-                      searchByNameBrand ||
+                      searchByNameDescription ||
                       selectedCategory !== "Todos" ||
                       selectedStockStatus !== "todos" ||
                       appliedPriceRange.min ||
@@ -784,7 +782,7 @@ const Stock = () => {
                   </div>
 
                   {/* Indicador de búsqueda activa - SIMPLIFICADO */}
-                  {(searchByCode.trim() || searchByNameBrand.trim()) && (
+                  {(searchByCode.trim() || searchByNameDescription.trim()) && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                       <div className="flex items-center gap-2 text-blue-800">
                         <Search className="w-4 h-4" />
@@ -889,7 +887,7 @@ const Stock = () => {
 
                   {/* Filtros activos - MEJORADO */}
                   {(searchByCode ||
-                    searchByNameBrand ||
+                    searchByNameDescription ||
                     selectedCategory !== "Todos" ||
                     selectedStockStatus !== "todos" ||
                     appliedPriceRange.min ||
@@ -910,16 +908,16 @@ const Stock = () => {
                           </Button>
                         </Badge>
                       )}
-                      {searchByNameBrand && (
+                      {searchByNameDescription && (
                         <Badge variant="secondary" className="flex items-center gap-1 bg-green-100 text-green-800">
                           <Search className="w-3 h-3" />
-                          Nombre/Marca: "{searchByNameBrand}"
+                          Nombre/Descripción: "{searchByNameDescription}"
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             className="h-4 w-4 p-0 ml-1"
-                            onClick={clearNameBrandSearch}
+                            onClick={clearNameDescriptionSearch}
                           >
                             <X className="w-2 h-2" />
                           </Button>
@@ -962,7 +960,7 @@ const Stock = () => {
                     Lista de Productos
                   </CardTitle>
                   <CardDescription>
-                    {searchByCode.trim() || searchByNameBrand.trim() ? (
+                    {searchByCode.trim() || searchByNameDescription.trim() ? (
                       <>
                         {displayProducts.length} resultado{displayProducts.length !== 1 ? "s" : ""} de búsqueda
                         {isSearchActive && searchResults.length === 0 && " (buscando...)"}
@@ -984,7 +982,7 @@ const Stock = () => {
                     size="sm"
                     onClick={handleSortOrderToggle}
                     className="flex items-center gap-1 border-slate-800 bg-transparent"
-                    disabled={searchByCode.trim() || searchByNameBrand.trim()} // Deshabilitar durante búsqueda
+                    disabled={searchByCode.trim() || searchByNameDescription.trim()} // Deshabilitar durante búsqueda
                   >
                     {sortConfig.sortOrder === "asc" ? (
                       <>
@@ -1000,7 +998,9 @@ const Stock = () => {
                   </Button>
                   <Badge variant="outline" className="w-fit">
                     Total:{" "}
-                    {searchByCode.trim() || searchByNameBrand.trim() ? displayProducts.length : pagination.totalItems}
+                    {searchByCode.trim() || searchByNameDescription.trim()
+                      ? displayProducts.length
+                      : pagination.totalItems}
                   </Badge>
                 </div>
               </div>
@@ -1154,7 +1154,7 @@ const Stock = () => {
                       <Package className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                       <h3 className="text-lg font-medium text-muted-foreground mb-2">No se encontraron productos</h3>
                       <p className="text-muted-foreground mb-4">
-                        {searchByCode.trim() || searchByNameBrand.trim()
+                        {searchByCode.trim() || searchByNameDescription.trim()
                           ? "No hay productos que coincidan con tu búsqueda"
                           : selectedCategory !== "Todos" ||
                               selectedStockStatus !== "todos" ||
@@ -1164,7 +1164,7 @@ const Stock = () => {
                             : "Comienza agregando tu primer producto"}
                       </p>
                       {!searchByCode.trim() &&
-                        !searchByNameBrand.trim() &&
+                        !searchByNameDescription.trim() &&
                         selectedCategory === "Todos" &&
                         selectedStockStatus === "todos" &&
                         !appliedPriceRange.min &&
@@ -1180,7 +1180,7 @@ const Stock = () => {
               </LoadingOverlay>
 
               {/* Componente de paginación - Solo mostrar si no hay búsqueda activa */}
-              {!searchByCode.trim() && !searchByNameBrand.trim() && (
+              {!searchByCode.trim() && !searchByNameDescription.trim() && (
                 <Pagination
                   currentPage={pagination.currentPage}
                   totalPages={pagination.totalPages}

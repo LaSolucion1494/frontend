@@ -11,10 +11,10 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
   const [barcodeImage, setBarcodeImage] = useState(null)
 
   const sizeConfig = {
-    small: { width: 2, height: 50, fontSize: 12 }, // Aumentado
-    medium: { width: 3, height: 80, fontSize: 16 }, // Aumentado
-    large: { width: 4, height: 100, fontSize: 18 }, // Aumentado
-    thermal: { width: 5, height: 80, fontSize: 26, textMargin: 10 }, // MÁS GRANDE para térmica
+    small: { width: 1, height: 40, fontSize: 10 },
+    medium: { width: 2, height: 60, fontSize: 14 },
+    large: { width: 2, height: 80, fontSize: 16 },
+    thermal: { width: 5, height: 45, fontSize: 22, textMargin: 6, margin: 1 }, // OPTIMIZADO para térmica
   }
 
   useEffect(() => {
@@ -53,11 +53,11 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
     if (barcodeImage) {
       // Generar código de barras optimizado para impresión térmica - MEJORADO
       const thermalBarcodeImage = barcodeService.generateBarcodeImage(code, {
-        width: 5, // Aumentado de 4 a 5 para barras MÁS gruesas
-        height: 80, // Aumentado de 60 a 80 para barras más altas
-        fontSize: 28, // Aumentado de 26 a 28 para texto MÁS GRANDE
-        margin: 5, // Aumentado de 3 a 5
-        textMargin: 12, // Aumentado de 10 a 12 para más espacio
+        width: 5, // Aumentado de 4 a 5 para barras MÁS GRUESAS
+        height: 45, // Reducido de 60 a 45 para ser más compacto
+        fontSize: 22, // Ajustado de 26 a 22 para balance
+        margin: 1, // Reducido de 3 a 1 para maximizar espacio
+        textMargin: 6, // Reducido de 10 a 6
         displayValue: true,
         background: "#ffffff",
         lineColor: "#000000",
@@ -106,17 +106,17 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
             .barcode-image {
               width: 100%;
               height: auto;
-              max-height: 35mm; /* Aumentado de 30mm a 35mm para barras más grandes */
+              max-height: 32mm; /* Aumentado de 30mm a 32mm para el código más grande */
               object-fit: contain;
             }
             
             .product-code {
-              font-size: 18px; /* Aumentado de 14px a 18px */
+              font-size: 16px; /* Reducido de 18px a 16px para balance */
               font-family: 'Courier New', monospace;
               font-weight: bold;
-              margin-top: 3mm; /* Aumentado de 2mm a 3mm */
-              letter-spacing: 1.5px; /* Aumentado de 1px a 1.5px */
-              line-height: 1.2;
+              margin-top: 2mm; /* Reducido de 3mm a 2mm */
+              letter-spacing: 1.2px; /* Reducido de 1.5px a 1.2px */
+              line-height: 1.1;
             }
             
             .no-print { 
@@ -149,9 +149,9 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
               }
               
               .product-code {
-                font-size: 18px !important; /* Forzar tamaño en impresión */
+                font-size: 16px !important; /* Forzar tamaño en impresión */
                 font-weight: bold !important;
-                letter-spacing: 1.5px !important;
+                letter-spacing: 1.2px !important;
               }
               
               .no-print { 

@@ -123,12 +123,12 @@ export const barcodeService = {
     try {
       const thermalOptions = {
         format: "CODE128",
-        width: 5, // Aumentado de 4 a 5 para barras MÁS GRUESAS
-        height: 45, // Reducido de 60 a 45 para ser más compacto
+        width: 4, // Aumentado de 3 a 4 para barras más gruesas
+        height: 60, // Reducido de 80 a 60 para dar más espacio al texto
         displayValue: true,
-        fontSize: 22, // Reducido ligeramente de 24 a 22
-        textMargin: 6, // Reducido de 8 a 6 para más compacidad
-        margin: 1, // Reducido de 3 a 1 para maximizar espacio
+        fontSize: 24, // Aumentado de 18 a 24 para texto más grande
+        textMargin: 8, // Aumentado de 5 a 8 para más espacio
+        margin: 3, // Aumentado ligeramente
         background: "#ffffff",
         lineColor: "#000000",
         textAlign: "center",
@@ -178,19 +178,19 @@ export const barcodeService = {
 
       // Generar código de barras optimizado para térmica - MEJORADO
       const barcodeImage = barcodeService.generateThermalBarcodeImage(product.codigo, {
-        width: 5, // Aumentado de 4 a 5 para barras más gruesas
-        height: 30, // Aumentado de 25 a 30 para mejor legibilidad
-        fontSize: 20, // Reducido de 24 a 20 para balance
-        margin: 1, // Reducido de 2 a 1 para maximizar espacio
-        textMargin: 6, // Reducido de 8 a 6
+        width: 4, // Barras más gruesas
+        height: 25, // Altura reducida para dar más espacio al texto
+        fontSize: 24, // Texto más grande
+        margin: 2,
+        textMargin: 8, // Más espacio para el texto
       })
 
       if (barcodeImage) {
-        // Centrar el código de barras con dimensiones optimizadas
-        const barcodeWidth = 52 // Aumentado de 50 a 52 para usar más espacio
-        const barcodeHeight = 30 // Aumentado de 25 a 30
+        // Centrar el código de barras
+        const barcodeWidth = 50
+        const barcodeHeight = 25 // Reducido para dar más espacio al texto
         const x = (55 - barcodeWidth) / 2
-        const y = 3 // Reducido de 5 a 3 para más espacio
+        const y = 5 // Movido más arriba
 
         // Agregar código de barras
         doc.addImage(barcodeImage, "PNG", x, y, barcodeWidth, barcodeHeight)
@@ -235,16 +235,16 @@ export const barcodeService = {
 
       // Generar código de barras MEJORADO
       const barcodeImage = barcodeService.generateThermalBarcodeImage(product.codigo, {
-        width: 5, // Aumentado de 4 a 5
-        height: 25, // Aumentado de 20 a 25
-        fontSize: 18, // Reducido de 20 a 18
-        margin: 1, // Reducido de 2 a 1
-        textMargin: 5, // Reducido de 6 a 5
+        width: 4, // Barras más gruesas
+        height: 20, // Altura reducida
+        fontSize: 20, // Texto más grande
+        margin: 2,
+        textMargin: 6,
       })
 
       if (barcodeImage) {
-        // Agregar código de barras con dimensiones optimizadas
-        doc.addImage(barcodeImage, "PNG", x + 1.5, y + 4, 52, 22) // Dimensiones optimizadas
+        // Agregar código de barras
+        doc.addImage(barcodeImage, "PNG", x + 2.5, y + 6, 50, 18)
 
         // Agregar código con fuente MÁS GRANDE
         doc.setFontSize(14) // Aumentado de 10 a 14

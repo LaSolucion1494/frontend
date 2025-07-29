@@ -84,17 +84,15 @@ const Stock = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [productToDelete, setProductToDelete] = useState(null)
 
-  // Estados para búsqueda mejorada - SIMILAR AL MODAL QUE FUNCIONA
-  const [codeSearchLoading, setCodeSearchLoading] = useState(false)
-  const [nameSearchLoading, setNameSearchLoading] = useState(false)
+  // Estados para búsqueda mejorada - OPTIMIZADO PARA MANTENER FOCO
   const [searchResults, setSearchResults] = useState([])
-  const [isSearching, setIsSearching] = useState(false)
+  const [isSearchActive, setIsSearchActive] = useState(false)
 
   // Refs para los inputs de búsqueda
   const searchCodeInputRef = useRef(null)
   const searchNameBrandInputRef = useRef(null)
 
-  // Refs para debounce - MEJORADOS
+  // Refs para debounce - SIN ESTADOS DE LOADING QUE CAUSEN RE-RENDERS
   const codeSearchTimeoutRef = useRef(null)
   const nameSearchTimeoutRef = useRef(null)
 
@@ -107,21 +105,24 @@ const Stock = () => {
     createProduct,
     updateProduct,
     deleteProduct,
+    getProductByCode,
     fetchProducts,
     updateSorting,
     resetSorting,
     updateFilters,
-    handlePageChange,
     searchProducts, // Usar la función de búsqueda del hook
+    handlePageChange,
   } = useProducts()
   const { categories, loading: categoriesLoading } = useCategories()
   const { config } = useConfig()
   const { createStockMovement } = useStockMovements()
 
-  // NUEVA FUNCIÓN DE BÚSQUEDA MEJORADA - BASADA EN EL MODAL EXITOSO
+  // NUEVA FUNCIÓN DE BÚSQUEDA MEJORADA - SIN CAMBIOS DE LOADING STATE
   const handleCodeSearch = useCallback(
     async (searchTerm) => {
       if (!searchTerm.trim()) {
+        setSearchResults([])
+        setIsSearchActive(false)
         // Si no hay término, usar fetchProducts normal con filtros actuales
         const filters = {
           search: "",
@@ -137,8 +138,7 @@ const Stock = () => {
 
       try {
         console.log("Buscando por código en stock:", searchTerm)
-        setCodeSearchLoading(true)
-        setIsSearching(true)
+        setIsSearchActive(true)
 
         const searchResult = await searchProducts(searchTerm.trim(), {
           limit: pagination.itemsPerPage || 10,
@@ -168,8 +168,6 @@ const Stock = () => {
             })
 
           console.log("Coincidencias de código encontradas en stock:", codeMatches.length)
-
-          // Actualizar los productos directamente en lugar de usar updateFilters
           setSearchResults(codeMatches)
 
           // Si hay coincidencia exacta, mostrar toast
@@ -184,9 +182,6 @@ const Stock = () => {
       } catch (error) {
         console.error("Error en búsqueda por código en stock:", error)
         setSearchResults([])
-      } finally {
-        setCodeSearchLoading(false)
-        setIsSearching(false)
       }
     },
     [searchProducts, selectedCategory, selectedStockStatus, appliedPriceRange, pagination.itemsPerPage, updateFilters],
@@ -195,6 +190,8 @@ const Stock = () => {
   const handleNameSearch = useCallback(
     async (searchTerm) => {
       if (!searchTerm.trim()) {
+        setSearchResults([])
+        setIsSearchActive(false)
         // Si no hay término, usar fetchProducts normal con filtros actuales
         const filters = {
           search: "",
@@ -210,8 +207,7 @@ const Stock = () => {
 
       try {
         console.log("Buscando por nombre en stock:", searchTerm)
-        setNameSearchLoading(true)
-        setIsSearching(true)
+        setIsSearchActive(true)
 
         const searchResult = await searchProducts(searchTerm.trim(), {
           limit: pagination.itemsPerPage || 10,
@@ -260,15 +256,12 @@ const Stock = () => {
       } catch (error) {
         console.error("Error en búsqueda por nombre en stock:", error)
         setSearchResults([])
-      } finally {
-        setNameSearchLoading(false)
-        setIsSearching(false)
       }
     },
     [searchProducts, selectedCategory, selectedStockStatus, appliedPriceRange, pagination.itemsPerPage, updateFilters],
   )
 
-  // DEBOUNCE MEJORADO - BASADO EN EL MODAL EXITOSO
+  // DEBOUNCE OPTIMIZADO - SIN CAMBIOS DE LOADING STATE QUE CAUSEN RE-RENDERS
   useEffect(() => {
     // Limpiar timeout anterior
     if (codeSearchTimeoutRef.current) {
@@ -276,12 +269,12 @@ const Stock = () => {
     }
 
     if (searchByCode.trim()) {
-      codeSearchTimeoutRef.current = setTimeout(() => {
-        handleCodeSearch(searchByCode)
-      }, 200) // Reducido de 500ms a 200ms como en el modal exitoso
+      codeSearchTimeoutRef.current = setTimeout(async () => {
+        await handleCodeSearch(searchByCode)
+      }, 200)
     } else {
       setSearchResults([])
-      setCodeSearchLoading(false)
+      setIsSearchActive(false)
       // Si no hay búsqueda por código, usar filtros normales
       if (!searchByNameBrand.trim()) {
         const filters = {
@@ -302,15 +295,7 @@ const Stock = () => {
         clearTimeout(codeSearchTimeoutRef.current)
       }
     }
-  }, [
-    searchByCode,
-    handleCodeSearch,
-    searchByNameBrand,
-    selectedCategory,
-    selectedStockStatus,
-    appliedPriceRange,
-    updateFilters,
-  ])
+  }, [searchByCode])
 
   useEffect(() => {
     // Limpiar timeout anterior
@@ -319,12 +304,12 @@ const Stock = () => {
     }
 
     if (searchByNameBrand.trim()) {
-      nameSearchTimeoutRef.current = setTimeout(() => {
-        handleNameSearch(searchByNameBrand)
-      }, 300) // Reducido de 500ms a 300ms como en el modal exitoso
+      nameSearchTimeoutRef.current = setTimeout(async () => {
+        await handleNameSearch(searchByNameBrand)
+      }, 300)
     } else {
       setSearchResults([])
-      setNameSearchLoading(false)
+      setIsSearchActive(false)
       // Si no hay búsqueda por nombre, usar filtros normales
       if (!searchByCode.trim()) {
         const filters = {
@@ -345,15 +330,7 @@ const Stock = () => {
         clearTimeout(nameSearchTimeoutRef.current)
       }
     }
-  }, [
-    searchByNameBrand,
-    handleNameSearch,
-    searchByCode,
-    selectedCategory,
-    selectedStockStatus,
-    appliedPriceRange,
-    updateFilters,
-  ])
+  }, [searchByNameBrand])
 
   // Limpiar timeouts al desmontar el componente
   useEffect(() => {
@@ -367,15 +344,15 @@ const Stock = () => {
     }
   }, [])
 
-  // DETERMINAR QUÉ PRODUCTOS MOSTRAR
+  // DETERMINAR QUÉ PRODUCTOS MOSTRAR - OPTIMIZADO
   const displayProducts = useMemo(() => {
     // Si hay búsquedas activas, mostrar resultados de búsqueda
-    if ((searchByCode.trim() || searchByNameBrand.trim()) && searchResults.length >= 0) {
+    if ((searchByCode.trim() || searchByNameBrand.trim()) && isSearchActive) {
       return searchResults
     }
     // Si no hay búsquedas, mostrar productos normales
     return products
-  }, [searchByCode, searchByNameBrand, searchResults, products])
+  }, [searchByCode, searchByNameBrand, searchResults, products, isSearchActive])
 
   // Preparar categorías para el select
   const categoryOptions = useMemo(() => {
@@ -511,33 +488,28 @@ const Stock = () => {
     }
   }
 
-  // Función para limpiar búsqueda por código
+  // Función para limpiar búsqueda por código - OPTIMIZADA
   const clearCodeSearch = () => {
     setSearchByCode("")
     setSearchResults([])
-    setCodeSearchLoading(false)
-    if (searchCodeInputRef.current) {
-      searchCodeInputRef.current.focus()
-    }
+    setIsSearchActive(false)
+    // NO CAMBIAR FOCO AQUÍ - mantener foco natural
   }
 
-  // Función para limpiar búsqueda por nombre/marca
+  // Función para limpiar búsqueda por nombre/marca - OPTIMIZADA
   const clearNameBrandSearch = () => {
     setSearchByNameBrand("")
     setSearchResults([])
-    setNameSearchLoading(false)
-    if (searchNameBrandInputRef.current) {
-      searchNameBrandInputRef.current.focus()
-    }
+    setIsSearchActive(false)
+    // NO CAMBIAR FOCO AQUÍ - mantener foco natural
   }
 
-  // Función para limpiar todos los filtros
+  // Función para limpiar todos los filtros - OPTIMIZADA
   const clearFilters = () => {
     setSearchByCode("")
     setSearchByNameBrand("")
     setSearchResults([])
-    setCodeSearchLoading(false)
-    setNameSearchLoading(false)
+    setIsSearchActive(false)
     setSelectedCategory("Todos")
     setSelectedStockStatus("todos")
     setPriceRange({ min: "", max: "" })
@@ -550,8 +522,7 @@ const Stock = () => {
     setSearchByCode("")
     setSearchByNameBrand("")
     setSearchResults([])
-    setCodeSearchLoading(false)
-    setNameSearchLoading(false)
+    setIsSearchActive(false)
     fetchProducts({ offset: 0 })
   }
 
@@ -605,8 +576,8 @@ const Stock = () => {
     return priceRange.min !== appliedPriceRange.min || priceRange.max !== appliedPriceRange.max
   }, [priceRange, appliedPriceRange])
 
-  // DETERMINAR ESTADO DE LOADING
-  const isCurrentlyLoading = productsLoading || codeSearchLoading || nameSearchLoading || isSearching
+  // DETERMINAR ESTADO DE LOADING - SIMPLIFICADO
+  const isCurrentlyLoading = productsLoading
 
   // Loading state
   if (productsLoading && displayProducts.length === 0) {
@@ -697,7 +668,7 @@ const Stock = () => {
                 <div className="space-y-4">
                   {/* Búsquedas principales */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Input para búsqueda por código - MEJORADO */}
+                    {/* Input para búsqueda por código - SIN LOADING INDICATORS */}
                     <div className="space-y-2">
                       <Label htmlFor="searchCode">Buscar por código</Label>
                       <div className="relative">
@@ -712,11 +683,6 @@ const Stock = () => {
                           autoComplete="off"
                           disabled={isCurrentlyLoading}
                         />
-                        {codeSearchLoading && (
-                          <div className="absolute right-8 top-1/2 transform -translate-y-1/2">
-                            <RefreshCw className="w-4 h-4 animate-spin text-slate-600" />
-                          </div>
-                        )}
                         {searchByCode && (
                           <Button
                             type="button"
@@ -731,7 +697,7 @@ const Stock = () => {
                       </div>
                     </div>
 
-                    {/* Input para búsqueda por nombre/marca - MEJORADO */}
+                    {/* Input para búsqueda por nombre/marca - SIN LOADING INDICATORS */}
                     <div className="space-y-2">
                       <Label htmlFor="searchNameBrand">Buscar por nombre/marca</Label>
                       <div className="relative">
@@ -746,11 +712,6 @@ const Stock = () => {
                           autoComplete="off"
                           disabled={isCurrentlyLoading}
                         />
-                        {nameSearchLoading && (
-                          <div className="absolute right-8 top-1/2 transform -translate-y-1/2">
-                            <RefreshCw className="w-4 h-4 animate-spin text-slate-600" />
-                          </div>
-                        )}
                         {searchByNameBrand && (
                           <Button
                             type="button"
@@ -821,6 +782,22 @@ const Stock = () => {
                       </Button>
                     )}
                   </div>
+
+                  {/* Indicador de búsqueda activa - SIMPLIFICADO */}
+                  {(searchByCode.trim() || searchByNameBrand.trim()) && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <div className="flex items-center gap-2 text-blue-800">
+                        <Search className="w-4 h-4" />
+                        <span className="text-sm font-medium">
+                          Búsqueda activa - Mostrando {displayProducts.length} resultado
+                          {displayProducts.length !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                      <p className="text-xs text-blue-700 mt-1">
+                        Los filtros de categoría, stock y precio no se aplican durante la búsqueda.
+                      </p>
+                    </div>
+                  )}
 
                   {showAdvancedFilters && (
                     <div className="border-t pt-4 space-y-4">
@@ -970,23 +947,6 @@ const Stock = () => {
                       )}
                     </div>
                   )}
-
-                  {/* Indicador de búsqueda activa */}
-                  {(searchByCode.trim() || searchByNameBrand.trim()) && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <div className="flex items-center gap-2 text-blue-800">
-                        <Search className="w-4 h-4" />
-                        <span className="text-sm font-medium">
-                          Búsqueda activa - Mostrando {displayProducts.length} resultado
-                          {displayProducts.length !== 1 ? "s" : ""}
-                        </span>
-                        {isSearching && <RefreshCw className="w-4 h-4 animate-spin" />}
-                      </div>
-                      <p className="text-xs text-blue-700 mt-1">
-                        Los filtros de categoría, stock y precio no se aplican durante la búsqueda.
-                      </p>
-                    </div>
-                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1005,7 +965,7 @@ const Stock = () => {
                     {searchByCode.trim() || searchByNameBrand.trim() ? (
                       <>
                         {displayProducts.length} resultado{displayProducts.length !== 1 ? "s" : ""} de búsqueda
-                        {isSearching && " (buscando...)"}
+                        {isSearchActive && searchResults.length === 0 && " (buscando...)"}
                       </>
                     ) : (
                       <>
@@ -1047,7 +1007,7 @@ const Stock = () => {
             </CardHeader>
 
             <CardContent className="-mt-3">
-              <LoadingOverlay loading={isCurrentlyLoading && displayProducts.length > 0} text="Buscando productos...">
+              <LoadingOverlay loading={isCurrentlyLoading && displayProducts.length > 0} text="Cargando productos...">
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-slate-800">

@@ -94,6 +94,16 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
               page-break-after: always;
             }
             
+            .company-name {
+              font-size: 12px;
+              font-family: 'Arial', sans-serif;
+              font-weight: bold;
+              margin-bottom: 2mm;
+              color: #000;
+              text-align: center;
+              line-height: 1.2;
+            }
+            
             .barcode-container {
               width: 100%;
               max-width: 50mm;
@@ -106,16 +116,16 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
             .barcode-image {
               width: 100%;
               height: auto;
-              max-height: 35mm; /* Aumentado de 30mm a 35mm para barras más grandes */
+              max-height: 30mm; /* Reducido para dar espacio al nombre de la empresa */
               object-fit: contain;
             }
             
             .product-code {
-              font-size: 18px; /* Aumentado de 14px a 18px */
+              font-size: 16px; /* Reducido ligeramente para dar espacio a la empresa */
               font-family: 'Courier New', monospace;
               font-weight: bold;
-              margin-top: 3mm; /* Aumentado de 2mm a 3mm */
-              letter-spacing: 1.5px; /* Aumentado de 1px a 1.5px */
+              margin-top: 2mm;
+              letter-spacing: 1.2px;
               line-height: 1.2;
             }
             
@@ -148,10 +158,16 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
                 background: white !important;
               }
               
-              .product-code {
-                font-size: 18px !important; /* Forzar tamaño en impresión */
+              .company-name {
+                font-size: 12px !important;
                 font-weight: bold !important;
-                letter-spacing: 1.5px !important;
+                margin-bottom: 2mm !important;
+              }
+              
+              .product-code {
+                font-size: 16px !important; /* Forzar tamaño en impresión */
+                font-weight: bold !important;
+                letter-spacing: 1.2px !important;
               }
               
               .no-print { 
@@ -218,6 +234,7 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
         </head>
         <body>
           <div class="thermal-label">
+            <div class="company-name">La Solucion Repuestos S.A.S</div>
             <div class="barcode-container">
               <img src="${thermalBarcodeImage}" alt="Código de barras ${code}" class="barcode-image" />
               <div class="product-code">${code}</div>
@@ -258,6 +275,9 @@ const BarcodeDisplay = ({ code, productName = "", showControls = true, size = "m
     <Card className={`bg-white ${className}`}>
       <CardContent className="p-4">
         <div className="text-center space-y-3">
+          {/* Mostrar nombre de la empresa en la vista previa */}
+          <div className="text-xs font-bold text-slate-700 mb-2">La Solucion Repuestos S.A.S</div>
+
           {barcodeImage ? (
             <div className="bg-white p-2 rounded border inline-block">
               <img

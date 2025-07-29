@@ -176,27 +176,35 @@ export const barcodeService = {
         doc.addPage()
       }
 
+      // AGREGAR NOMBRE DE LA EMPRESA EN LA PARTE SUPERIOR
+      doc.setFontSize(10)
+      doc.setFont("helvetica", "bold")
+      const companyName = "La Solucion Repuestos S.A.S"
+      const companyWidth = doc.getTextWidth(companyName)
+      const companyX = (55 - companyWidth) / 2
+      doc.text(companyName, companyX, 4)
+
       // Generar código de barras optimizado para térmica - MEJORADO
       const barcodeImage = barcodeService.generateThermalBarcodeImage(product.codigo, {
         width: 4, // Barras más gruesas
-        height: 25, // Altura reducida para dar más espacio al texto
-        fontSize: 24, // Texto más grande
+        height: 20, // Altura reducida para dar más espacio al texto de la empresa
+        fontSize: 20, // Texto más grande
         margin: 2,
-        textMargin: 8, // Más espacio para el texto
+        textMargin: 6, // Más espacio para el texto
       })
 
       if (barcodeImage) {
-        // Centrar el código de barras
+        // Centrar el código de barras (movido más abajo para dar espacio a la empresa)
         const barcodeWidth = 50
-        const barcodeHeight = 25 // Reducido para dar más espacio al texto
+        const barcodeHeight = 20 // Reducido para dar más espacio al texto de la empresa
         const x = (55 - barcodeWidth) / 2
-        const y = 5 // Movido más arriba
+        const y = 8 // Movido más abajo para dar espacio al nombre de la empresa
 
         // Agregar código de barras
         doc.addImage(barcodeImage, "PNG", x, y, barcodeWidth, barcodeHeight)
 
         // Agregar código del producto con fuente MÁS GRANDE
-        doc.setFontSize(16) // Aumentado de 12 a 16
+        doc.setFontSize(14) // Aumentado de 12 a 14
         doc.setFont("courier", "bold")
         const codeWidth = doc.getTextWidth(product.codigo)
         const codeX = (55 - codeWidth) / 2
@@ -233,23 +241,29 @@ export const barcodeService = {
       const x = margin + currentCol * labelWidth
       const y = margin + currentRow * labelHeight
 
+      // AGREGAR NOMBRE DE LA EMPRESA EN LA PARTE SUPERIOR DE CADA ETIQUETA
+      doc.setFontSize(8)
+      doc.setFont("helvetica", "bold")
+      const companyName = "La Solucion Repuestos S.A.S"
+      doc.text(companyName, x + 27.5, y + 4, { align: "center" })
+
       // Generar código de barras MEJORADO
       const barcodeImage = barcodeService.generateThermalBarcodeImage(product.codigo, {
         width: 4, // Barras más gruesas
-        height: 20, // Altura reducida
-        fontSize: 20, // Texto más grande
+        height: 16, // Altura reducida para dar espacio a la empresa
+        fontSize: 16, // Texto más grande
         margin: 2,
-        textMargin: 6,
+        textMargin: 4,
       })
 
       if (barcodeImage) {
-        // Agregar código de barras
-        doc.addImage(barcodeImage, "PNG", x + 2.5, y + 6, 50, 18)
+        // Agregar código de barras (movido más abajo para dar espacio a la empresa)
+        doc.addImage(barcodeImage, "PNG", x + 2.5, y + 8, 50, 14)
 
         // Agregar código con fuente MÁS GRANDE
-        doc.setFontSize(14) // Aumentado de 10 a 14
+        doc.setFontSize(12) // Aumentado de 10 a 12
         doc.setFont("courier", "bold")
-        doc.text(product.codigo, x + 27.5, y + 32, { align: "center" })
+        doc.text(product.codigo, x + 27.5, y + 28, { align: "center" })
 
         // Agregar borde para visualización
         doc.setDrawColor(200, 200, 200)

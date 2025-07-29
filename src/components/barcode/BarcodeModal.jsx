@@ -64,7 +64,7 @@ const BarcodeModal = ({ isOpen, onClose, product }) => {
               {product.nombre} - {product.codigo}
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              Optimizado para papel térmico 55mm x 44mm - Texto grande y claro
+              Optimizado para papel térmico 55mm x 44mm - Incluye nombre de empresa
             </p>
           </div>
           <Button
@@ -93,6 +93,10 @@ const BarcodeModal = ({ isOpen, onClose, product }) => {
 
           {/* Información del producto */}
           <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="font-medium text-slate-600">Empresa:</span>
+              <p className="text-slate-800 font-semibold">La Solucion Repuestos S.A.S</p>
+            </div>
             <div>
               <span className="font-medium text-slate-600">Producto:</span>
               <p className="text-slate-800">{product.nombre}</p>
@@ -139,7 +143,7 @@ const BarcodeModal = ({ isOpen, onClose, product }) => {
               </Button>
             </div>
             <p className="text-xs text-blue-600 mt-2">
-              💡 El PDF térmico está optimizado para impresoras térmicas con texto grande y legible
+              💡 El PDF térmico incluye el nombre de la empresa "La Solucion Repuestos S.A.S" en la parte superior
             </p>
           </div>
         </div>

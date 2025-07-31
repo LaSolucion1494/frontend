@@ -57,7 +57,7 @@ class PricingService {
     return parsed
   }
 
-  // Calcular precio de venta con NUEVA LÓGICA
+  // Calcular precio de venta con NUEVA LÓGICA CORREGIDA
   calculateSalePrice(costPrice, config) {
     if (!costPrice || costPrice <= 0) return 0
 
@@ -69,31 +69,28 @@ class PricingService {
 
       console.log("Calculando precio con configuración:", { rentabilidad, iva, ingresosBrutos, otrosImpuestos })
 
-      // NUEVA LÓGICA DE CÁLCULO:
+      // NUEVA LÓGICA DE CÁLCULO CORREGIDA:
 
-      // 1. Calcular ingresos brutos sobre el costo base
+      // 1. Calcular IVA directamente sobre el costo base
+      const ivaMonto = costPrice * (iva / 100)
+
+      // 2. Calcular ingresos brutos directamente sobre el costo base
       const ingresosBrutosMonto = costPrice * (ingresosBrutos / 100)
 
-      // 2. Subtotal con ingresos brutos
-      const subtotalConIngresosBrutos = costPrice + ingresosBrutosMonto
+      // 3. Sumar costo + IVA + ingresos brutos = precio nuevo
+      const precioNuevo = costPrice + ivaMonto + ingresosBrutosMonto
 
-      // 3. Calcular IVA sobre el subtotal (costo + ingresos brutos)
-      const ivaMonto = subtotalConIngresosBrutos * (iva / 100)
+      // 4. Calcular rentabilidad sobre el precio nuevo
+      const rentabilidadMonto = precioNuevo * (rentabilidad / 100)
 
-      // 4. Subtotal con impuestos básicos (costo + ingresos brutos + IVA)
-      const subtotalConImpuestosBasicos = subtotalConIngresosBrutos + ivaMonto
+      // 5. Sumar rentabilidad al precio nuevo
+      const precioConRentabilidad = precioNuevo + rentabilidadMonto
 
-      // 5. Calcular rentabilidad sobre el subtotal con impuestos básicos
-      const rentabilidadMonto = subtotalConImpuestosBasicos * (rentabilidad / 100)
+      // 6. Calcular otros impuestos sobre el resultado con rentabilidad
+      const otrosImpuestosMonto = precioConRentabilidad * (otrosImpuestos / 100)
 
-      // 6. Subtotal con rentabilidad
-      const subtotalConRentabilidad = subtotalConImpuestosBasicos + rentabilidadMonto
-
-      // 7. Calcular otros impuestos sobre el resultado con rentabilidad
-      const otrosImpuestosMonto = subtotalConRentabilidad * (otrosImpuestos / 100)
-
-      // 8. Precio final
-      const precioFinal = subtotalConRentabilidad + otrosImpuestosMonto
+      // 7. Precio final
+      const precioFinal = precioConRentabilidad + otrosImpuestosMonto
 
       const resultado = Math.round(precioFinal * 100) / 100
       console.log("Precio calculado:", { costPrice, precioFinal: resultado })
@@ -105,17 +102,16 @@ class PricingService {
     }
   }
 
-  // Obtener desglose detallado del precio con NUEVA LÓGICA
+  // Obtener desglose detallado del precio con NUEVA LÓGICA CORREGIDA
   getPriceBreakdown(costPrice, config) {
     if (!costPrice || costPrice <= 0) {
       return {
         costo: 0,
-        ingresosBrutos: 0,
-        subtotalConIngresosBrutos: 0,
         iva: 0,
-        subtotalConImpuestosBasicos: 0,
+        ingresosBrutos: 0,
+        precioNuevo: 0,
         rentabilidad: 0,
-        subtotalConRentabilidad: 0,
+        precioConRentabilidad: 0,
         otrosImpuestos: 0,
         precioFinal: 0,
       }
@@ -126,32 +122,36 @@ class PricingService {
     const ingresosBrutos = this.parseNumber(config?.ingresos_brutos, 0)
     const otrosImpuestos = this.parseNumber(config?.otros_impuestos, 0)
 
-    // NUEVA LÓGICA DE CÁLCULO CON DESGLOSE DETALLADO:
+    // NUEVA LÓGICA DE CÁLCULO CORREGIDA CON DESGLOSE DETALLADO:
 
-    // 1. Ingresos brutos sobre costo base
+    // 1. Calcular IVA directamente sobre el costo base
+    const ivaMonto = costPrice * (iva / 100)
+
+    // 2. Calcular ingresos brutos directamente sobre el costo base
     const ingresosBrutosMonto = costPrice * (ingresosBrutos / 100)
-    const subtotalConIngresosBrutos = costPrice + ingresosBrutosMonto
 
-    // 2. IVA sobre (costo + ingresos brutos)
-    const ivaMonto = subtotalConIngresosBrutos * (iva / 100)
-    const subtotalConImpuestosBasicos = subtotalConIngresosBrutos + ivaMonto
+    // 3. Sumar costo + IVA + ingresos brutos = precio nuevo
+    const precioNuevo = costPrice + ivaMonto + ingresosBrutosMonto
 
-    // 3. Rentabilidad sobre (costo + ingresos brutos + IVA)
-    const rentabilidadMonto = subtotalConImpuestosBasicos * (rentabilidad / 100)
-    const subtotalConRentabilidad = subtotalConImpuestosBasicos + rentabilidadMonto
+    // 4. Calcular rentabilidad sobre el precio nuevo
+    const rentabilidadMonto = precioNuevo * (rentabilidad / 100)
 
-    // 4. Otros impuestos sobre el resultado con rentabilidad
-    const otrosImpuestosMonto = subtotalConRentabilidad * (otrosImpuestos / 100)
-    const precioFinal = subtotalConRentabilidad + otrosImpuestosMonto
+    // 5. Sumar rentabilidad al precio nuevo
+    const precioConRentabilidad = precioNuevo + rentabilidadMonto
+
+    // 6. Calcular otros impuestos sobre el resultado con rentabilidad
+    const otrosImpuestosMonto = precioConRentabilidad * (otrosImpuestos / 100)
+
+    // 7. Precio final
+    const precioFinal = precioConRentabilidad + otrosImpuestosMonto
 
     return {
       costo: Math.round(costPrice * 100) / 100,
-      ingresosBrutos: Math.round(ingresosBrutosMonto * 100) / 100,
-      subtotalConIngresosBrutos: Math.round(subtotalConIngresosBrutos * 100) / 100,
       iva: Math.round(ivaMonto * 100) / 100,
-      subtotalConImpuestosBasicos: Math.round(subtotalConImpuestosBasicos * 100) / 100,
+      ingresosBrutos: Math.round(ingresosBrutosMonto * 100) / 100,
+      precioNuevo: Math.round(precioNuevo * 100) / 100,
       rentabilidad: Math.round(rentabilidadMonto * 100) / 100,
-      subtotalConRentabilidad: Math.round(subtotalConRentabilidad * 100) / 100,
+      precioConRentabilidad: Math.round(precioConRentabilidad * 100) / 100,
       otrosImpuestos: Math.round(otrosImpuestosMonto * 100) / 100,
       precioFinal: Math.round(precioFinal * 100) / 100,
     }

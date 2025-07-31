@@ -342,35 +342,51 @@ const ProductModal = ({ isOpen, onClose, onSave, product, isEditing, categories 
     onClose()
   }
 
-  // Cálculos de precios con configuración activa
+  // Cálculos de precios con configuración activa - NUEVA LÓGICA
   const calculatePriceBreakdown = () => {
     if (!formData.precioCosto || formData.precioCosto <= 0) {
       return {
         costo: 0,
-        rentabilidad: 0,
         ingresosBrutos: 0,
-        otrosImpuestos: 0,
-        precioNeto: 0,
+        subtotalConIngresosBrutos: 0,
         iva: 0,
+        subtotalConImpuestosBasicos: 0,
+        rentabilidad: 0,
+        subtotalConRentabilidad: 0,
+        otrosImpuestos: 0,
         precioFinal: 0,
       }
     }
 
     const costo = formData.precioCosto
-    const rentabilidadMonto = costo * (activeConfig.rentabilidad / 100)
+
+    // NUEVA LÓGICA DE CÁLCULO:
+
+    // 1. Ingresos brutos sobre costo base
     const ingresosBrutosMonto = costo * (activeConfig.ingresos_brutos / 100)
-    const otrosImpuestosMonto = costo * (activeConfig.otros_impuestos / 100)
-    const precioNeto = costo + rentabilidadMonto + ingresosBrutosMonto + otrosImpuestosMonto
-    const ivaMonto = precioNeto * (activeConfig.iva / 100)
-    const precioFinal = precioNeto + ivaMonto
+    const subtotalConIngresosBrutos = costo + ingresosBrutosMonto
+
+    // 2. IVA sobre (costo + ingresos brutos)
+    const ivaMonto = subtotalConIngresosBrutos * (activeConfig.iva / 100)
+    const subtotalConImpuestosBasicos = subtotalConIngresosBrutos + ivaMonto
+
+    // 3. Rentabilidad sobre (costo + ingresos brutos + IVA)
+    const rentabilidadMonto = subtotalConImpuestosBasicos * (activeConfig.rentabilidad / 100)
+    const subtotalConRentabilidad = subtotalConImpuestosBasicos + rentabilidadMonto
+
+    // 4. Otros impuestos sobre el resultado con rentabilidad
+    const otrosImpuestosMonto = subtotalConRentabilidad * (activeConfig.otros_impuestos / 100)
+    const precioFinal = subtotalConRentabilidad + otrosImpuestosMonto
 
     return {
       costo: Math.round(costo * 100) / 100,
-      rentabilidad: Math.round(rentabilidadMonto * 100) / 100,
       ingresosBrutos: Math.round(ingresosBrutosMonto * 100) / 100,
-      otrosImpuestos: Math.round(otrosImpuestosMonto * 100) / 100,
-      precioNeto: Math.round(precioNeto * 100) / 100,
+      subtotalConIngresosBrutos: Math.round(subtotalConIngresosBrutos * 100) / 100,
       iva: Math.round(ivaMonto * 100) / 100,
+      subtotalConImpuestosBasicos: Math.round(subtotalConImpuestosBasicos * 100) / 100,
+      rentabilidad: Math.round(rentabilidadMonto * 100) / 100,
+      subtotalConRentabilidad: Math.round(subtotalConRentabilidad * 100) / 100,
+      otrosImpuestos: Math.round(otrosImpuestosMonto * 100) / 100,
       precioFinal: Math.round(precioFinal * 100) / 100,
     }
   }
@@ -490,7 +506,7 @@ const ProductModal = ({ isOpen, onClose, onSave, product, isEditing, categories 
                     {formData.tieneCodigoBarras && (
                       <p className="text-xs text-slate-500 flex items-center gap-1">
                         <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                        Código de barras habilitado. 
+                        Código de barras habilitado.
                       </p>
                     )}
                   </div>
@@ -845,7 +861,7 @@ const ProductModal = ({ isOpen, onClose, onSave, product, isEditing, categories 
                       </div>
                     </div>
 
-                    {/* Mostrar cálculo de precios */}
+                    {/* Mostrar cálculo de precios con NUEVA LÓGICA */}
                     {formData.precioCosto <= 0 ? (
                       <div className="text-center py-4">
                         <div className="text-slate-500 mb-2">
@@ -858,7 +874,7 @@ const ProductModal = ({ isOpen, onClose, onSave, product, isEditing, categories 
                       </div>
                     ) : (
                       <div className="space-y-6">
-                        {/* Flujo horizontal del cálculo */}
+                        {/* Flujo horizontal del cálculo - NUEVA LÓGICA */}
                         <div className="overflow-x-auto pb-4">
                           <div className="flex items-center space-x-3 min-w-max px-2">
                             {/* Paso 1: Precio de Costo */}
@@ -886,44 +902,14 @@ const ProductModal = ({ isOpen, onClose, onSave, product, isEditing, categories 
                               </svg>
                             </div>
 
-                            {/* Paso 2: Ganancia Bruta */}
-                            <div className="flex-shrink-0 w-48">
-                              <div className="bg-white rounded-lg p-4 border border-slate-800 shadow-sm h-32 flex flex-col justify-between">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
-                                    2
-                                  </div>
-                                  <div className="text-xs font-medium text-slate-700 flex items-center">
-                                    <TrendingUp className="w-3 h-3 mr-1 text-blue-600" />
-                                    Ganancia ({activeConfig.rentabilidad}%)
-                                  </div>
-                                </div>
-                                <div className="text-center flex-1 flex flex-col justify-center">
-                                  <div className="text-lg font-bold text-blue-600">
-                                    + {formatCurrency(priceBreakdown.rentabilidad)}
-                                  </div>
-                                  <div className="text-xs text-slate-500 mt-1">
-                                    = {formatCurrency(priceBreakdown.costo + priceBreakdown.rentabilidad)}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Flecha */}
-                            <div className="flex-shrink-0 text-slate-800">
-                              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                              </svg>
-                            </div>
-
-                            {/* Paso 3: Ingresos Brutos (condicional) */}
+                            {/* Paso 2: Ingresos Brutos (condicional) */}
                             {priceBreakdown.ingresosBrutos > 0 ? (
                               <>
                                 <div className="flex-shrink-0 w-48">
                                   <div className="bg-white rounded-lg p-4 border border-slate-800 shadow-sm h-32 flex flex-col justify-between">
                                     <div className="flex items-center space-x-2 mb-2">
                                       <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-xs">
-                                        3
+                                        2
                                       </div>
                                       <div className="text-xs font-medium text-slate-700 flex items-center">
                                         <Building className="w-3 h-3 mr-1 text-blue-500" />
@@ -935,12 +921,7 @@ const ProductModal = ({ isOpen, onClose, onSave, product, isEditing, categories 
                                         + {formatCurrency(priceBreakdown.ingresosBrutos)}
                                       </div>
                                       <div className="text-xs text-slate-500 mt-1">
-                                        ={" "}
-                                        {formatCurrency(
-                                          priceBreakdown.costo +
-                                            priceBreakdown.rentabilidad +
-                                            priceBreakdown.ingresosBrutos,
-                                        )}
+                                        = {formatCurrency(priceBreakdown.subtotalConIngresosBrutos)}
                                       </div>
                                     </div>
                                   </div>
@@ -958,66 +939,25 @@ const ProductModal = ({ isOpen, onClose, onSave, product, isEditing, categories 
                               </>
                             ) : null}
 
-                            {/* Paso 4: Otros Impuestos (condicional) */}
-                            {priceBreakdown.otrosImpuestos > 0 ? (
-                              <>
-                                <div className="flex-shrink-0 w-48">
-                                  <div className="bg-white rounded-lg p-4 border border-slate-800 shadow-sm h-32 flex flex-col justify-between">
-                                    <div className="flex items-center space-x-2 mb-2">
-                                      <div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
-                                        {priceBreakdown.ingresosBrutos > 0 ? "4" : "3"}
-                                      </div>
-                                      <div className="text-xs font-medium text-slate-700 flex items-center">
-                                        <PlusCircle className="w-3 h-3 mr-1 text-indigo-600" />
-                                        Otros Imp. ({activeConfig.otros_impuestos}%)
-                                      </div>
-                                    </div>
-                                    <div className="text-center flex-1 flex flex-col justify-center">
-                                      <div className="text-lg font-bold text-indigo-600">
-                                        + {formatCurrency(priceBreakdown.otrosImpuestos)}
-                                      </div>
-                                      <div className="text-xs text-slate-500 mt-1">
-                                        ={" "}
-                                        {formatCurrency(
-                                          priceBreakdown.costo +
-                                            priceBreakdown.rentabilidad +
-                                            priceBreakdown.ingresosBrutos +
-                                            priceBreakdown.otrosImpuestos,
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="flex-shrink-0 text-slate-800">
-                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M9 5l7 7-7 7"
-                                    />
-                                  </svg>
-                                </div>
-                              </>
-                            ) : null}
-
-                            {/* Paso 5: Precio Neto */}
+                            {/* Paso 3: IVA */}
                             <div className="flex-shrink-0 w-48">
-                              <div className="bg-white rounded-lg p-4 border border-slate-800 shadow-md h-32 flex flex-col justify-between">
+                              <div className="bg-white rounded-lg p-4 border border-slate-800 shadow-sm h-32 flex flex-col justify-between">
                                 <div className="flex items-center space-x-2 mb-2">
-                                  <div className="w-6 h-6 bg-slate-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
-                                    =
+                                  <div className="w-6 h-6 bg-orange-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
+                                    {priceBreakdown.ingresosBrutos > 0 ? "3" : "2"}
                                   </div>
                                   <div className="text-xs font-medium text-slate-700 flex items-center">
-                                    <Receipt className="w-3 h-3 mr-1 text-slate-600" />
-                                    Precio Neto
+                                    <Receipt className="w-3 h-3 mr-1 text-orange-600" />
+                                    IVA ({activeConfig.iva}%)
                                   </div>
                                 </div>
                                 <div className="text-center flex-1 flex flex-col justify-center">
-                                  <div className="text-lg font-bold text-slate-700">
-                                    {formatCurrency(priceBreakdown.precioNeto)}
+                                  <div className="text-lg font-bold text-orange-600">
+                                    + {formatCurrency(priceBreakdown.iva)}
                                   </div>
-                                  <div className="text-xs text-slate-500 mt-1">Sin IVA</div>
+                                  <div className="text-xs text-slate-500 mt-1">
+                                    = {formatCurrency(priceBreakdown.subtotalConImpuestosBasicos)}
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -1029,35 +969,80 @@ const ProductModal = ({ isOpen, onClose, onSave, product, isEditing, categories 
                               </svg>
                             </div>
 
-                            {/* Paso 6: IVA */}
+                            {/* Paso 4: Rentabilidad */}
                             <div className="flex-shrink-0 w-48">
                               <div className="bg-white rounded-lg p-4 border border-slate-800 shadow-sm h-32 flex flex-col justify-between">
                                 <div className="flex items-center space-x-2 mb-2">
-                                  <div className="w-6 h-6 bg-orange-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
-                                    +
+                                  <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
+                                    {priceBreakdown.ingresosBrutos > 0 ? "4" : "3"}
                                   </div>
                                   <div className="text-xs font-medium text-slate-700 flex items-center">
-                                    <Receipt className="w-3 h-3 mr-1 text-orange-600" />
-                                    IVA ({activeConfig.iva}%)
+                                    <TrendingUp className="w-3 h-3 mr-1 text-green-600" />
+                                    Rentabilidad ({activeConfig.rentabilidad}%)
                                   </div>
                                 </div>
                                 <div className="text-center flex-1 flex flex-col justify-center">
-                                  <div className="text-lg font-bold text-orange-600">
-                                    + {formatCurrency(priceBreakdown.iva)}
+                                  <div className="text-lg font-bold text-green-600">
+                                    + {formatCurrency(priceBreakdown.rentabilidad)}
                                   </div>
-                                  <div className="text-xs text-slate-500 mt-1">Sobre precio neto</div>
+                                  <div className="text-xs text-slate-500 mt-1">
+                                    = {formatCurrency(priceBreakdown.subtotalConRentabilidad)}
+                                  </div>
                                 </div>
                               </div>
                             </div>
 
-                            {/* Flecha final */}
-                            <div className="flex-shrink-0 text-green-500">
+                            {/* Flecha */}
+                            <div className="flex-shrink-0 text-slate-800">
                               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                               </svg>
                             </div>
 
-                            {/* Paso 7: Precio Final */}
+                            {/* Paso 5: Otros Impuestos (condicional) */}
+                            {priceBreakdown.otrosImpuestos > 0 ? (
+                              <>
+                                <div className="flex-shrink-0 w-48">
+                                  <div className="bg-white rounded-lg p-4 border border-slate-800 shadow-sm h-32 flex flex-col justify-between">
+                                    <div className="flex items-center space-x-2 mb-2">
+                                      <div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
+                                        {priceBreakdown.ingresosBrutos > 0 ? "5" : "4"}
+                                      </div>
+                                      <div className="text-xs font-medium text-slate-700 flex items-center">
+                                        <PlusCircle className="w-3 h-3 mr-1 text-indigo-600" />
+                                        Otros Imp. ({activeConfig.otros_impuestos}%)
+                                      </div>
+                                    </div>
+                                    <div className="text-center flex-1 flex flex-col justify-center">
+                                      <div className="text-lg font-bold text-indigo-600">
+                                        + {formatCurrency(priceBreakdown.otrosImpuestos)}
+                                      </div>
+                                      <div className="text-xs text-slate-500 mt-1">
+                                        = {formatCurrency(priceBreakdown.precioFinal)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex-shrink-0 text-green-500">
+                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M9 5l7 7-7 7"
+                                    />
+                                  </svg>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex-shrink-0 text-green-500">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                              </div>
+                            )}
+
+                            {/* Paso Final: Precio Final */}
                             <div className="flex-shrink-0 w-56">
                               <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-4 border-2 border-green-300 shadow-lg h-32 flex flex-col justify-between">
                                 <div className="flex items-center space-x-2 mb-2">

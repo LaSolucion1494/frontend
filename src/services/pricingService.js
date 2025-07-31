@@ -57,7 +57,7 @@ class PricingService {
     return parsed
   }
 
-  // Calcular precio de venta con NUEVA LÓGICA CORREGIDA
+  // Calcular precio de venta con LÓGICA ACTUALIZADA DE OTROS IMPUESTOS INCLUIDOS
   calculateSalePrice(costPrice, config) {
     if (!costPrice || costPrice <= 0) return 0
 
@@ -69,7 +69,7 @@ class PricingService {
 
       console.log("Calculando precio con configuración:", { rentabilidad, iva, ingresosBrutos, otrosImpuestos })
 
-      // NUEVA LÓGICA DE CÁLCULO CORREGIDA:
+      // LÓGICA DE CÁLCULO ACTUALIZADA:
 
       // 1. Calcular IVA directamente sobre el costo base
       const ivaMonto = costPrice * (iva / 100)
@@ -86,11 +86,14 @@ class PricingService {
       // 5. Sumar rentabilidad al precio nuevo
       const precioConRentabilidad = precioNuevo + rentabilidadMonto
 
-      // 6. Calcular otros impuestos sobre el resultado con rentabilidad
-      const otrosImpuestosMonto = precioConRentabilidad * (otrosImpuestos / 100)
+      // 6. Aplicar otros impuestos INCLUIDOS en el precio final
+      let precioFinal = precioConRentabilidad
 
-      // 7. Precio final
-      const precioFinal = precioConRentabilidad + otrosImpuestosMonto
+      if (otrosImpuestos > 0 && otrosImpuestos < 100) {
+        // Fórmula: precio / (1 - (otros_impuestos / 100))
+        const divisor = 1 - otrosImpuestos / 100
+        precioFinal = precioConRentabilidad / divisor
+      }
 
       const resultado = Math.round(precioFinal * 100) / 100
       console.log("Precio calculado:", { costPrice, precioFinal: resultado })
@@ -102,7 +105,7 @@ class PricingService {
     }
   }
 
-  // Obtener desglose detallado del precio con NUEVA LÓGICA CORREGIDA
+  // Obtener desglose detallado del precio con LÓGICA ACTUALIZADA DE OTROS IMPUESTOS INCLUIDOS
   getPriceBreakdown(costPrice, config) {
     if (!costPrice || costPrice <= 0) {
       return {
@@ -112,7 +115,7 @@ class PricingService {
         precioNuevo: 0,
         rentabilidad: 0,
         precioConRentabilidad: 0,
-        otrosImpuestos: 0,
+        otrosImpuestosIncluidos: 0,
         precioFinal: 0,
       }
     }
@@ -122,7 +125,7 @@ class PricingService {
     const ingresosBrutos = this.parseNumber(config?.ingresos_brutos, 0)
     const otrosImpuestos = this.parseNumber(config?.otros_impuestos, 0)
 
-    // NUEVA LÓGICA DE CÁLCULO CORREGIDA CON DESGLOSE DETALLADO:
+    // LÓGICA DE CÁLCULO ACTUALIZADA CON DESGLOSE DETALLADO:
 
     // 1. Calcular IVA directamente sobre el costo base
     const ivaMonto = costPrice * (iva / 100)
@@ -139,11 +142,18 @@ class PricingService {
     // 5. Sumar rentabilidad al precio nuevo
     const precioConRentabilidad = precioNuevo + rentabilidadMonto
 
-    // 6. Calcular otros impuestos sobre el resultado con rentabilidad
-    const otrosImpuestosMonto = precioConRentabilidad * (otrosImpuestos / 100)
+    // 6. Aplicar otros impuestos INCLUIDOS en el precio final
+    let precioFinal = precioConRentabilidad
+    let otrosImpuestosIncluidos = 0
 
-    // 7. Precio final
-    const precioFinal = precioConRentabilidad + otrosImpuestosMonto
+    if (otrosImpuestos > 0 && otrosImpuestos < 100) {
+      // Fórmula: precio / (1 - (otros_impuestos / 100))
+      const divisor = 1 - otrosImpuestos / 100
+      precioFinal = precioConRentabilidad / divisor
+
+      // Calcular el monto de otros impuestos incluidos
+      otrosImpuestosIncluidos = precioFinal - precioConRentabilidad
+    }
 
     return {
       costo: Math.round(costPrice * 100) / 100,
@@ -152,7 +162,7 @@ class PricingService {
       precioNuevo: Math.round(precioNuevo * 100) / 100,
       rentabilidad: Math.round(rentabilidadMonto * 100) / 100,
       precioConRentabilidad: Math.round(precioConRentabilidad * 100) / 100,
-      otrosImpuestos: Math.round(otrosImpuestosMonto * 100) / 100,
+      otrosImpuestosIncluidos: Math.round(otrosImpuestosIncluidos * 100) / 100,
       precioFinal: Math.round(precioFinal * 100) / 100,
     }
   }

@@ -342,7 +342,7 @@ const ProductModal = ({ isOpen, onClose, onSave, product, isEditing, categories 
     onClose()
   }
 
-  // Cálculos de precios con configuración activa - NUEVA LÓGICA CORREGIDA
+  // Cálculos de precios con configuración activa - LÓGICA ACTUALIZADA CON OTROS IMPUESTOS INCLUIDOS
   const calculatePriceBreakdown = () => {
     if (!formData.precioCosto || formData.precioCosto <= 0) {
       return {
@@ -352,14 +352,14 @@ const ProductModal = ({ isOpen, onClose, onSave, product, isEditing, categories 
         precioNuevo: 0,
         rentabilidad: 0,
         precioConRentabilidad: 0,
-        otrosImpuestos: 0,
+        otrosImpuestosIncluidos: 0,
         precioFinal: 0,
       }
     }
 
     const costo = formData.precioCosto
 
-    // NUEVA LÓGICA DE CÁLCULO CORREGIDA:
+    // LÓGICA DE CÁLCULO ACTUALIZADA:
 
     // 1. Calcular IVA directamente sobre el costo base
     const ivaMonto = costo * (activeConfig.iva / 100)
@@ -376,11 +376,18 @@ const ProductModal = ({ isOpen, onClose, onSave, product, isEditing, categories 
     // 5. Sumar rentabilidad al precio nuevo
     const precioConRentabilidad = precioNuevo + rentabilidadMonto
 
-    // 6. Calcular otros impuestos sobre el resultado con rentabilidad
-    const otrosImpuestosMonto = precioConRentabilidad * (activeConfig.otros_impuestos / 100)
+    // 6. Aplicar otros impuestos INCLUIDOS en el precio final
+    let precioFinal = precioConRentabilidad
+    let otrosImpuestosIncluidos = 0
 
-    // 7. Precio final
-    const precioFinal = precioConRentabilidad + otrosImpuestosMonto
+    if (activeConfig.otros_impuestos > 0 && activeConfig.otros_impuestos < 100) {
+      // Fórmula: precio / (1 - (otros_impuestos / 100))
+      const divisor = 1 - activeConfig.otros_impuestos / 100
+      precioFinal = precioConRentabilidad / divisor
+
+      // Calcular el monto de otros impuestos incluidos
+      otrosImpuestosIncluidos = precioFinal - precioConRentabilidad
+    }
 
     return {
       costo: Math.round(costo * 100) / 100,
@@ -389,7 +396,7 @@ const ProductModal = ({ isOpen, onClose, onSave, product, isEditing, categories 
       precioNuevo: Math.round(precioNuevo * 100) / 100,
       rentabilidad: Math.round(rentabilidadMonto * 100) / 100,
       precioConRentabilidad: Math.round(precioConRentabilidad * 100) / 100,
-      otrosImpuestos: Math.round(otrosImpuestosMonto * 100) / 100,
+      otrosImpuestosIncluidos: Math.round(otrosImpuestosIncluidos * 100) / 100,
       precioFinal: Math.round(precioFinal * 100) / 100,
     }
   }
@@ -1026,23 +1033,23 @@ const ProductModal = ({ isOpen, onClose, onSave, product, isEditing, categories 
                               </svg>
                             </div>
 
-                            {/* Paso 6: Otros Impuestos (condicional) */}
-                            {priceBreakdown.otrosImpuestos > 0 ? (
+                            {/* Paso 6: Otros Impuestos INCLUIDOS (condicional) */}
+                            {priceBreakdown.otrosImpuestosIncluidos > 0 ? (
                               <>
                                 <div className="flex-shrink-0 w-48">
                                   <div className="bg-white rounded-lg p-4 border border-slate-800 shadow-sm h-32 flex flex-col justify-between">
                                     <div className="flex items-center space-x-2 mb-2">
                                       <div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
-                                        +
+                                        ÷
                                       </div>
                                       <div className="text-xs font-medium text-slate-700 flex items-center">
                                         <PlusCircle className="w-3 h-3 mr-1 text-indigo-600" />
-                                        Otros Imp. ({activeConfig.otros_impuestos}%)
+                                        Otros Imp. Incluidos ({activeConfig.otros_impuestos}%)
                                       </div>
                                     </div>
                                     <div className="text-center flex-1 flex flex-col justify-center">
                                       <div className="text-lg font-bold text-indigo-600">
-                                        + {formatCurrency(priceBreakdown.otrosImpuestos)}
+                                        ÷ {(1 - activeConfig.otros_impuestos / 100).toFixed(2)}
                                       </div>
                                       <div className="text-xs text-slate-500 mt-1">
                                         = {formatCurrency(priceBreakdown.precioFinal)}
